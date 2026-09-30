@@ -775,3 +775,91 @@ label {
   color: var(--muted);
   opacity: 0.7;
 }
+
+/* Hold-to-talk mic */
+.hold-mic {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: none;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.hold-icon {
+  position: relative;
+  z-index: 2;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 3.2rem;
+  background: var(--accent);
+  box-shadow: 0 8px 0 #d86a22;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.3s;
+  pointer-events: none;
+}
+.hold-mic.active .hold-icon {
+  transform: translateY(6px) scale(1.06);
+  box-shadow: 0 2px 0 #d86a22;
+}
+.hold-mic.active.ready .hold-icon {
+  background: var(--right);
+  box-shadow: 0 2px 0 #1f9657;
+}
+.hold-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+.hold-track {
+  fill: none;
+  stroke: #eee4d4;
+  stroke-width: 8;
+}
+.hold-fill {
+  fill: none;
+  stroke: var(--accent-2);
+  stroke-width: 8;
+  stroke-linecap: round;
+  animation-name: hold-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.hold-mic.ready .hold-fill {
+  stroke: var(--right);
+}
+@keyframes hold-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.hold-wave {
+  position: absolute;
+  inset: 17px;
+  border-radius: 50%;
+  border: 4px solid var(--right);
+  animation: hold-wave 1.2s ease-out infinite;
+  pointer-events: none;
+}
+.hold-wave.second {
+  animation-delay: 0.6s;
+}
+@keyframes hold-wave {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}

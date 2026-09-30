@@ -6,12 +6,17 @@ const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
 
 const PARENT_CODE_KEY = 'dovi-parent-code'
 
+/** Headers must be Latin-1, and the code may be Hebrew: send it as base64 of its UTF-8 bytes. */
+function encodeHeader(code: string): string {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(code)))
+}
+
 function makeClient(parentCode?: string | null): SupabaseClient | null {
   if (!url || !key) return null
   return createClient(url, key, {
     // No login: skip the auth machinery (and the warning about several auth clients).
     auth: { persistSession: false, autoRefreshToken: false, storageKey: parentCode ? 'dovi-parent' : 'dovi' },
-    global: parentCode ? { headers: { 'x-parent-code': parentCode } } : undefined,
+    global: parentCode ? { headers: { 'x-parent-code': encodeHeader(parentCode) } } : undefined,
   })
 }
 
@@ -158,6 +163,21 @@ export async function finishSession(
     })
     .eq('id', sessionId)
   if (error) console.warn('supabase: could not finish session', error)
+}
+
+/** Save answers as the game goes, so a game left in the middle still shows what happened. */
+export async function saveSessionDetails(
+  sessionId: string | null,
+  total: number,
+  correct: number,
+  details: unknown[],
+) {
+  if (!supabase || !sessionId) return
+  const { error } = await supabase
+    .from('game_sessions')
+    .update({ total_questions: total, correct_answers: correct, details })
+    .eq('id', sessionId)
+  if (error) console.warn('supabase: could not save answers', error)
 }
 
 /** Move the learner to the group after `fromGroupId`; returns its id, or null at the last group. */

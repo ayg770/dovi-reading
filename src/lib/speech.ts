@@ -14,6 +14,7 @@ type RecognitionCtor = new () => {
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
   onerror: ((e: { error: string }) => void) | null
   onend: (() => void) | null
+  onaudiostart: (() => void) | null
 }
 
 const Recognition: RecognitionCtor | undefined =
@@ -26,20 +27,31 @@ export const canRecognize = !!Recognition
 
 export type Heard = { alternatives: string[]; error?: string }
 
-export type Listening = { result: Promise<Heard>; stop: () => void }
+export type Listening = {
+  result: Promise<Heard>
+  /** Stop listening and deliver what was heard so far. */
+  stop: () => void
+  /** Stop and throw away what was heard. */
+  abort: () => void
+}
 
-/** Listen once; the recognizer stops by itself after a pause. */
-export function listen(): Listening {
-  if (!Recognition) return { result: Promise.resolve({ alternatives: [], error: 'unsupported' }), stop() {} }
+/**
+ * Listen until stop() — the button is held for as long as he reads, so the
+ * recognizer doesn't cut him off at a pause. `onReady` fires once the mic is live.
+ */
+export function listen(onReady?: () => void): Listening {
+  if (!Recognition)
+    return { result: Promise.resolve({ alternatives: [], error: 'unsupported' }), stop() {}, abort() {} }
   const r = new Recognition()
   r.lang = 'he-IL'
   // Short syllables often end before a "final" result; keep interim guesses too.
   r.interimResults = true
   r.maxAlternatives = 5
-  r.continuous = false
+  r.continuous = true
   const alternatives: string[] = []
   let error: string | undefined
   const result = new Promise<Heard>((resolve) => {
+    r.onaudiostart = () => onReady?.()
     r.onresult = (e) => {
       for (const res of Array.from(e.results))
         for (const alt of Array.from(res)) {
@@ -53,7 +65,7 @@ export function listen(): Listening {
     r.onend = () => resolve({ alternatives, error })
   })
   r.start()
-  return { result, stop: () => r.stop() }
+  return { result, stop: () => r.stop(), abort: () => r.abort() }
 }
 
 // ---------------------------------------------------------------------------

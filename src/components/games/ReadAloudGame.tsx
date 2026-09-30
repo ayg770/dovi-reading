@@ -3,11 +3,12 @@ import { playItem, playUrl, praise, sfx, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
 import { Item, groupItems, randomSyllableItems } from '../../lib/items'
 import { Selection } from '../../lib/selection'
-import { canRecord, startRecording } from '../../lib/recorder'
-import { canRecognize, heardMatches, listen } from '../../lib/speech'
-import { finishSession, recordAnswer, startSession } from '../../lib/supabase'
+import { Recording, canRecord, startRecording } from '../../lib/recorder'
+import { Listening, canRecognize, heardMatches, listen } from '../../lib/speech'
+import { finishSession, recordAnswer, saveSessionDetails, startSession } from '../../lib/supabase'
 import { Confetti } from '../ui/Confetti'
 import { FinishScreen } from '../ui/FinishScreen'
+import { HoldMic } from '../ui/HoldMic'
 import { Stars } from '../ui/Stars'
 
 const GAME_TYPE = 'read_aloud'
@@ -15,6 +16,10 @@ const RANDOM_ROUNDS = 10
 const MAX_TRIES = 3
 /** After this many attempts where the recognizer heard nothing, a grown-up decides. */
 const MAX_EMPTY = 2
+/** Longest hold of the mic button. */
+const MAX_HOLD_MS = 8000
+/** A shorter press is a tap, not a reading. */
+const MIN_HOLD_MS = 400
 
 /**
  * Recording his voice while the recognizer listens needs the mic twice. Phones and
@@ -56,6 +61,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
   const [notice, setNotice] = useState<string | null>(null)
   const [empties, setEmpties] = useState(0)
   const [myVoice, setMyVoice] = useState<string | null>(null)
+  const [micReady, setMicReady] = useState(false)
   const [score, setScore] = useState(0)
   const [done, setDone] = useState(false)
   const [confetti, setConfetti] = useState(0)
@@ -64,7 +70,18 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
   const details = useRef<unknown[]>([])
   const scoreRef = useRef(0)
   const recordAlongside = useRef(canRecord && (SHARED_MIC_OK || !canRecognize))
-  const stopListening = useRef<() => void>(() => {})
+  /** The press in progress: recognizer, recorder, and when it started. */
+  const hold = useRef<{
+    listening: Listening | null
+    rec: Promise<Recording | null> | null
+    startedAt: number
+    timer: number
+    tooShort: boolean
+  } | null>(null)
+  // endHold can run from the auto-stop timer, after a re-render.
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
+  const phaseIsListening = () => phaseRef.current === 'listening'
 
   useEffect(() => {
     sessionId.current ??= startSession(GAME_TYPE)
@@ -79,7 +96,8 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       }
     })
     return () => {
-      stopListening.current()
+      hold.current?.listening?.abort()
+      void hold.current?.rec?.then((r) => r?.stop())
       stopAudio()
     }
   }, [selection])
@@ -96,7 +114,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
   const item = items[index]
   const total = items.length
 
-  const finishItem = (correct: boolean, how: string) => {
+  const finishItem = (correct: boolean, how: string, heardText = '', alternatives: string[] = []) => {
     const firstTry = tries === 0
     if (how === 'parent-override' && tries === 1) {
       // The recognizer got his first try wrong; count it as the right answer it was.
@@ -108,12 +126,13 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
     } else if (firstTry) {
       for (const s of item.syllables)
         if (s.letter_id && s.nikud_id) void recordAnswer(s.letter_id, s.nikud_id, correct)
-      details.current.push({ item: item.text, correct, how, heard })
+      details.current.push({ item: item.text, correct, how, heard: heardText, alternatives })
       if (correct) {
         scoreRef.current += 1
         setScore(scoreRef.current)
       }
     }
+    void sessionId.current?.then((id) => saveSessionDetails(id, details.current.length, scoreRef.current, details.current))
     setTries((t) => t + 1)
     if (correct) {
       setPhase('right')
@@ -142,44 +161,81 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
     setPhase('look')
   }
 
-  const startTurn = async () => {
+  /** Press: start listening (and, where the mic can be shared, recording). */
+  const beginHold = () => {
     stopAudio()
     setNotice(null)
     setHeard('')
     setMyVoice(null)
+    setMicReady(false)
+    setPhase('listening')
+    phaseRef.current = 'listening'
     sfx.start()
-    await new Promise((r) => setTimeout(r, 250))
 
-    let rec: Awaited<ReturnType<typeof startRecording>> | null = null
-    if (recordAlongside.current) {
-      try {
-        rec = await startRecording(6000)
-      } catch {
-        recordAlongside.current = false
-      }
+    const rec = recordAlongside.current
+      ? startRecording(MAX_HOLD_MS + 500).catch(() => {
+          recordAlongside.current = false
+          return null
+        })
+      : null
+    const h = {
+      listening: null as Listening | null,
+      rec,
+      startedAt: Date.now(),
+      timer: window.setTimeout(() => endHold(), MAX_HOLD_MS),
+      tooShort: false,
     }
+    hold.current = h
 
-    if (!canRecognize) {
-      // No speech recognition in this browser: record, then a grown-up decides.
-      setPhase('listening')
-      stopListening.current = () => {
-        void rec?.stop().then((b) => setMyVoice(URL.createObjectURL(b)))
-        setPhase('judge')
-      }
-      if (!rec) setPhase('judge')
+    if (canRecognize) {
+      h.listening = listen(() => setMicReady(true))
+      void h.listening.result.then((result) => void handleResult(h, result))
+    } else {
+      // No recognition in this browser: just record, then a grown-up decides.
+      void rec?.then((r) => r && setMicReady(true))
+    }
+  }
+
+  /** Release: stop and judge what was said. */
+  const endHold = () => {
+    const h = hold.current
+    if (!h || !phaseIsListening()) return
+    window.clearTimeout(h.timer)
+    if (Date.now() - h.startedAt < MIN_HOLD_MS) {
+      h.tooShort = true
+      h.listening?.abort()
+      void h.rec?.then((r) => r?.stop())
+      hold.current = null
+      setNotice('צריך להחזיק את 🎤 לחוץ כל זמן שקוראים')
+      setPhase('look')
       return
     }
+    if (h.listening) h.listening.stop()
+    else void finishRecordingOnly(h)
+  }
 
-    setPhase('listening')
-    const l = listen()
-    stopListening.current = l.stop
-    const result = await l.result
-    const blob = rec ? await rec.stop() : null
+  const takeVoice = async (h: { rec: Promise<Recording | null> | null }) => {
+    const r = h.rec ? await h.rec : null
+    const blob = r ? await r.stop() : null
     if (blob && blob.size) setMyVoice(URL.createObjectURL(blob))
+    return !!r
+  }
+
+  const finishRecordingOnly = async (h: NonNullable<typeof hold.current>) => {
+    hold.current = null
+    await takeVoice(h)
+    setPhase('judge')
+  }
+
+  const handleResult = async (h: NonNullable<typeof hold.current>, result: { alternatives: string[]; error?: string }) => {
+    if (h.tooShort) return
+    if (hold.current === h) hold.current = null
+    window.clearTimeout(h.timer)
+    const recorded = await takeVoice(h)
 
     if (!result.alternatives.length) {
       // Recording alongside may have taken the mic from the recognizer: stop doing that.
-      if (rec) recordAlongside.current = false
+      if (recorded) recordAlongside.current = false
       const code = result.error ?? 'empty'
       const soft = !result.error || result.error === 'no-speech' || result.error === 'aborted'
       if (soft && empties + 1 < MAX_EMPTY) {
@@ -195,8 +251,9 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       return
     }
     setEmpties(0)
-    setHeard(result.alternatives[0])
-    finishItem(heardMatches(result.alternatives, item.syllables), 'speech')
+    const text = result.alternatives[result.alternatives.length - 1]
+    setHeard(text)
+    finishItem(heardMatches(result.alternatives, item.syllables), 'speech', text, result.alternatives)
   }
 
   if (done)
@@ -228,27 +285,28 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
         <span className="read-text">{item.text}</span>
       </div>
 
-      {phase === 'look' && (
+      {(phase === 'look' || phase === 'listening') && (
         <>
-          <p className="prompt">קרא בקול!</p>
+          <p className="prompt">
+            {phase === 'look' ? 'קרא בקול!' : micReady ? 'מקשיב… עזוב כשסיימת' : 'רגע…'}
+          </p>
           <div className="read-actions">
-            <button className="round-btn mic" onClick={() => void startTurn()} aria-label="עכשיו אני">
-              🎤
-            </button>
-            <button className="round-btn listen-small" onClick={() => void playItem(item)} aria-label="שמע">
-              🔊
-            </button>
+            <HoldMic
+              active={phase === 'listening'}
+              ready={micReady}
+              maxMs={MAX_HOLD_MS}
+              onPress={beginHold}
+              onRelease={endHold}
+            />
+            {phase === 'look' && (
+              <button className="round-btn listen-small" onClick={() => void playItem(item)} aria-label="שמע">
+                🔊
+              </button>
+            )}
           </div>
-          <p className="hint-text">{notice ?? 'לוחצים על 🎤 ואומרים. אפשר לשמוע קודם ב-🔊'}</p>
-        </>
-      )}
-
-      {phase === 'listening' && (
-        <>
-          <button className="round-btn mic listening" onClick={() => stopListening.current()}>
-            🎤
-          </button>
-          <p className="prompt">מקשיב…</p>
+          {phase === 'look' && (
+            <p className="hint-text">{notice ?? 'לוחצים על 🎤 ומחזיקים בזמן שקוראים. אפשר לשמוע קודם ב-🔊'}</p>
+          )}
         </>
       )}
 
@@ -271,7 +329,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
             </button>
           </div>
           {canRecognize && (
-            <button className="parent-link" onClick={() => void startTurn()}>
+            <button className="parent-link" onClick={() => setPhase('look')}>
               🎤 לנסות שוב את זיהוי הקול
             </button>
           )}
@@ -294,7 +352,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
           </div>
           <div className="finish-actions">
             {phase === 'wrong' && tries < MAX_TRIES && (
-              <button className="btn primary" onClick={() => void startTurn()}>
+              <button className="btn primary" onClick={() => setPhase('look')}>
                 🎤 שוב
               </button>
             )}
