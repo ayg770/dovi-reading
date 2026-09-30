@@ -669,3 +669,109 @@ label {
   align-items: center;
   gap: 8px;
 }
+
+/* Word choices: one per row, sized for 2–3 syllables */
+.choices.words {
+  grid-template-columns: 1fr;
+  max-width: 420px;
+}
+.choices.words .choice {
+  aspect-ratio: auto;
+  padding: 14px 8px;
+  font-size: clamp(2.6rem, 12vw, 3.6rem);
+}
+.progress-bar {
+  flex: 1;
+  height: 14px;
+  border-radius: 999px;
+  background: #e8dfd0;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+/* Content picker before a game */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 32px;
+}
+.picker .prompt {
+  text-align: center;
+  margin: 8px 0;
+}
+.picker-title {
+  margin: 0;
+  font-size: 1.4rem;
+}
+.picker-sub {
+  margin: 10px 0 0;
+  font-weight: 700;
+  color: var(--muted);
+}
+.pick-card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 12px 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: 3px solid transparent;
+  text-align: right;
+}
+.pick-card.on {
+  border-color: var(--accent);
+  background: #fff3e8;
+}
+.pick-name {
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+.pick-sample {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 1.4rem;
+  color: var(--muted);
+}
+.nikud-toggles {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.toggle {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 6px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 3px solid #e8dfd0;
+  font-weight: 600;
+  opacity: 0.6;
+}
+.toggle.on {
+  border-color: var(--accent-2);
+  opacity: 1;
+}
+.toggle-sample {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+.start-btn {
+  margin-top: 12px;
+  align-self: center;
+  font-size: 1.5rem;
+  padding: 14px 40px;
+}
+.mic-debug {
+  font-size: 0.75rem;
+  color: var(--muted);
+  opacity: 0.7;
+}

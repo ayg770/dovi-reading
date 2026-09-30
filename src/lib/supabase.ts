@@ -160,11 +160,11 @@ export async function finishSession(
   if (error) console.warn('supabase: could not finish session', error)
 }
 
-/** Move the learner to the next group; returns its id, or null at the last group. */
-export async function advanceGroup(): Promise<string | null> {
+/** Move the learner to the group after `fromGroupId`; returns its id, or null at the last group. */
+export async function advanceGroup(fromGroupId: string): Promise<string | null> {
   const userId = await getLearnerId()
   if (!supabase || !userId) return null
-  const { data, error } = await supabase.rpc('advance_group', { p_user: userId })
+  const { data, error } = await supabase.rpc('advance_group', { p_user: userId, p_from: fromGroupId })
   if (error) console.warn('supabase: could not advance group', error)
   forgetLearner()
   return data ?? null

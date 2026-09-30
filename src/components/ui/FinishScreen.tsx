@@ -7,18 +7,20 @@ import { Confetti } from './Confetti'
 type Props = {
   score: number
   total: number
-  /** name of the group played, when the game used a group */
+  /** the group played, when the game used a group */
+  groupId?: string | null
   groupName?: string | null
   onRestart: () => void
   onExit: () => void
+  onPlayGroup: (groupId: string) => void
 }
 
-/** End of a game: stars, praise, and — after a good round in a group — the next group. */
-export function FinishScreen({ score, total, groupName, onRestart, onExit }: Props) {
+/** End of a game: stars, praise, and — after a good round in a group — on to the next group. */
+export function FinishScreen({ score, total, groupId, groupName, onRestart, onExit, onPlayGroup }: Props) {
   const ratio = total ? score / total : 0
   const stars = ratio >= 0.9 ? 3 : ratio >= 0.6 ? 2 : 1
-  const canAdvance = !!groupName && ratio >= 0.8
-  const [advanced, setAdvanced] = useState<'no' | 'busy' | 'done' | 'last'>('no')
+  const canAdvance = !!groupId && ratio >= 0.8
+  const [state, setState] = useState<'idle' | 'busy' | 'last'>('idle')
 
   useEffect(() => {
     sfx.finish()
@@ -27,10 +29,12 @@ export function FinishScreen({ score, total, groupName, onRestart, onExit }: Pro
   }, [])
 
   const advance = async () => {
-    setAdvanced('busy')
-    const next = await advanceGroup()
+    if (!groupId) return
+    setState('busy')
+    const next = await advanceGroup(groupId)
     await refreshContent()
-    setAdvanced(next ? 'done' : 'last')
+    if (next) onPlayGroup(next)
+    else setState('last')
   }
 
   return (
@@ -42,13 +46,12 @@ export function FinishScreen({ score, total, groupName, onRestart, onExit }: Pro
         {score} מתוך {total}
       </p>
       {groupName && <p className="finish-group">קבוצה: {groupName}</p>}
-      {canAdvance && advanced === 'no' && (
-        <button className="btn next-group" onClick={advance}>
+      {canAdvance && state !== 'last' && (
+        <button className="btn next-group" disabled={state === 'busy'} onClick={() => void advance()}>
           לקבוצה הבאה ➜
         </button>
       )}
-      {advanced === 'done' && <p className="finish-group">עברנו לקבוצה הבאה! 🎉</p>}
-      {advanced === 'last' && <p className="finish-group">זו הייתה הקבוצה האחרונה 🏆</p>}
+      {state === 'last' && <p className="finish-group">זו הייתה הקבוצה האחרונה 🏆</p>}
       <div className="finish-actions">
         <button className="btn primary" onClick={onRestart}>
           עוד פעם

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Syllable, syllableText } from '../../data/hebrew'
-import { playLetterName, playSyllable, praise, sfx } from '../../lib/audio'
+import { Syllable } from '../../data/hebrew'
+import { playItem, playLetterName, praise, sfx } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
-import { activeGroup, groupSyllables } from '../../lib/items'
-import { Question, makeQuestion } from '../../lib/questions'
+import { Item, asSyllable, groupItems, syllableItem } from '../../lib/items'
+import { makeQuestion, makeWordQuestion } from '../../lib/questions'
+import { Selection } from '../../lib/selection'
 import {
   ProgressRow,
   finishSession,
-  getLearner,
   loadProgress,
   recordAnswer,
   startSession,
@@ -16,23 +16,31 @@ import { Confetti } from '../ui/Confetti'
 import { FinishScreen } from '../ui/FinishScreen'
 import { Stars } from '../ui/Stars'
 
-const ROUNDS = 10
+const SINGLES_ROUNDS = 10
 const GAME_TYPE = 'hear_syllable'
 
 type Status = 'asking' | 'right' | 'wrong'
 
-type Props = { onExit: () => void; onRestart: () => void }
+type Round = { answer: Item; choices: Item[] }
 
-export function HearSyllableGame({ onExit, onRestart }: Props) {
+type Props = {
+  selection: Selection
+  onExit: () => void
+  onRestart: () => void
+  onPlayGroup: (groupId: string) => void
+}
+
+/** Hear a syllable (or a word from a group) and pick how it is written. */
+export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: Props) {
   const [ready, setReady] = useState(false)
   const [progress, setProgress] = useState<ProgressRow[]>([])
-  const [pool, setPool] = useState<Syllable[]>([])
+  const [groupWords, setGroupWords] = useState<Item[] | null>(null)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [round, setRound] = useState(0)
   const [score, setScore] = useState(0)
-  const [question, setQuestion] = useState<Question | null>(null)
+  const [question, setQuestion] = useState<Round | null>(null)
   const [status, setStatus] = useState<Status>('asking')
-  const [picked, setPicked] = useState<Syllable | null>(null)
+  const [picked, setPicked] = useState<Item | null>(null)
   const [firstTry, setFirstTry] = useState(true)
   const [done, setDone] = useState(false)
   const [confetti, setConfetti] = useState(0)
@@ -43,71 +51,84 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
   // Read from setTimeout callbacks, so keep it in a ref as well as state.
   const scoreRef = useRef(0)
 
+  const nikudIds = selection.kind === 'singles' ? selection.nikudIds : []
+  const total = groupWords ? groupWords.length : SINGLES_ROUNDS
+
+  const singlesQuestion = useCallback(
+    (rows: ProgressRow[]): Round => {
+      const q = makeQuestion(rows, recent.current, nikudIds)
+      recent.current = [q.answer, ...recent.current].slice(0, 4)
+      return { answer: syllableItem(q.answer), choices: q.choices.map(syllableItem) }
+    },
+    [nikudIds.join()],
+  )
+
   useEffect(() => {
     sessionId.current ??= startSession(GAME_TYPE)
-    void Promise.all([ensureContent(), getLearner(), loadProgress()]).then(
-      ([content, learner, rows]) => {
-        const group = activeGroup(content, learner)
-        const syllables = group ? groupSyllables(group) : []
-        // A group needs at least two syllables to make a listening question.
-        const usable = syllables.length >= 2 ? syllables : []
-        setPool(usable)
-        setGroupName(usable.length && group ? group.name : null)
-        setProgress(rows)
-        setQuestion(makeQuestion(rows, [], usable))
-        setReady(true)
-      },
-    )
-  }, [])
+    void Promise.all([ensureContent(), loadProgress()]).then(([content, rows]) => {
+      setProgress(rows)
+      const group =
+        selection.kind === 'group' ? content.groups.find((g) => g.id === selection.groupId) : null
+      if (group && group.words.length) {
+        // A group plays its words in order, each against the most similar others.
+        const words = groupItems(group)
+        setGroupWords(words)
+        setGroupName(group.name)
+        setQuestion(makeWordQuestion(words[0], words))
+      } else {
+        setQuestion(singlesQuestion(rows))
+      }
+      setReady(true)
+    })
+  }, [selection, singlesQuestion])
 
-  // Say the syllable whenever a new question appears.
+  // Say it whenever a new question appears.
   useEffect(() => {
-    if (question && !done) void playSyllable(question.answer)
+    if (question && !done) void playItem(question.answer)
   }, [question, done])
 
   const next = useCallback(() => {
     if (!question) return
-    if (round + 1 >= ROUNDS) {
+    if (round + 1 >= total) {
       setDone(true)
-      void sessionId.current?.then((id) => finishSession(id, ROUNDS, scoreRef.current, details.current))
+      void sessionId.current?.then((id) => finishSession(id, total, scoreRef.current, details.current))
       return
     }
-    recent.current = [question.answer, ...recent.current].slice(0, 4)
     setRound((r) => r + 1)
-    setQuestion(makeQuestion(progress, recent.current, pool))
+    setQuestion(groupWords ? makeWordQuestion(groupWords[round + 1], groupWords) : singlesQuestion(progress))
     setStatus('asking')
     setPicked(null)
     setFirstTry(true)
-  }, [round, question, progress, pool])
+  }, [round, total, question, progress, groupWords, singlesQuestion])
 
   if (!ready || !question) return <div className="game loading">…</div>
 
-  const choose = (choice: Syllable) => {
+  const answerSyllable = asSyllable(question.answer)
+
+  const choose = (choice: Item) => {
     if (status === 'right') return
     const { answer } = question
-    const correct = choice.letter.id === answer.letter.id && choice.nikud.id === answer.nikud.id
+    const correct = choice.key === answer.key
     setPicked(choice)
 
     // Only the first try counts toward score and progress.
     if (firstTry) {
-      void recordAnswer(answer.letter.id, answer.nikud.id, correct)
-      details.current.push({
-        answer: syllableText(answer),
-        chosen: syllableText(choice),
-        correct,
-      })
-      setProgress((rows) => {
-        const row = rows.find(
-          (r) => r.letter_id === answer.letter.id && r.nikud_id === answer.nikud.id,
-        )
-        const updated = {
-          letter_id: answer.letter.id,
-          nikud_id: answer.nikud.id,
-          attempts: (row?.attempts ?? 0) + 1,
-          correct: (row?.correct ?? 0) + (correct ? 1 : 0),
-        }
-        return [...rows.filter((r) => r !== row), updated]
-      })
+      for (const s of answer.syllables)
+        if (s.letter_id && s.nikud_id) void recordAnswer(s.letter_id, s.nikud_id, correct)
+      details.current.push({ answer: answer.text, chosen: choice.text, correct })
+      if (answerSyllable) {
+        const { letter, nikud } = answerSyllable
+        setProgress((rows) => {
+          const row = rows.find((r) => r.letter_id === letter.id && r.nikud_id === nikud.id)
+          const updated = {
+            letter_id: letter.id,
+            nikud_id: nikud.id,
+            attempts: (row?.attempts ?? 0) + 1,
+            correct: (row?.correct ?? 0) + (correct ? 1 : 0),
+          }
+          return [...rows.filter((r) => r !== row), updated]
+        })
+      }
       setFirstTry(false)
     }
 
@@ -126,9 +147,9 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
       sfx.wrong()
       // Let him hear what he picked, then the target again.
       setTimeout(async () => {
-        await playSyllable(choice)
+        await playItem(choice)
         await new Promise((r) => setTimeout(r, 400))
-        await playSyllable(answer)
+        await playItem(answer)
       }, 600)
     }
   }
@@ -137,10 +158,12 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
     return (
       <FinishScreen
         score={score}
-        total={ROUNDS}
+        total={total}
+        groupId={selection.kind === 'group' && groupWords ? selection.groupId : null}
         groupName={groupName}
         onRestart={onRestart}
         onExit={onExit}
+        onPlayGroup={onPlayGroup}
       />
     )
 
@@ -151,40 +174,33 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
         <button className="btn small" onClick={onExit} aria-label="חזרה">
           ✕
         </button>
-        <Stars total={ROUNDS} filled={round} />
+        <Stars total={total} filled={round} />
         <span className="score">⭐ {score}</span>
       </header>
       {groupName && <p className="group-tag">{groupName}</p>}
 
-      <button
-        className="listen"
-        onClick={() => void playSyllable(question.answer)}
-        aria-label="שמע שוב"
-      >
+      <button className="listen" onClick={() => void playItem(question.answer)} aria-label="שמע שוב">
         🔊
       </button>
       <p className="prompt">מה שמעת?</p>
 
-      <div className="choices">
+      <div className={groupWords ? 'choices words' : 'choices'}>
         {question.choices.map((c) => {
-          const isPicked = picked && c.letter.id === picked.letter.id && c.nikud.id === picked.nikud.id
-          const isAnswer =
-            c.letter.id === question.answer.letter.id && c.nikud.id === question.answer.nikud.id
           const cls = [
             'choice',
-            isPicked && status === 'wrong' ? 'wrong' : '',
-            isAnswer && status === 'right' ? 'right' : '',
+            picked?.key === c.key && status === 'wrong' ? 'wrong' : '',
+            c.key === question.answer.key && status === 'right' ? 'right' : '',
           ].join(' ')
           return (
-            <button key={c.letter.id + '_' + c.nikud.id} className={cls} onClick={() => choose(c)}>
-              {syllableText(c)}
+            <button key={c.key} className={cls} onClick={() => choose(c)}>
+              {c.text}
             </button>
           )
         })}
       </div>
 
-      {status === 'wrong' && (
-        <button className="hint" onClick={() => void playLetterName(question.answer.letter)}>
+      {status === 'wrong' && answerSyllable && (
+        <button className="hint" onClick={() => void playLetterName(answerSyllable.letter)}>
           רמז: איזו אות? 🔤
         </button>
       )}

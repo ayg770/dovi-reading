@@ -1,24 +1,52 @@
 import { useEffect, useRef, useState } from 'react'
-import { playUrl, playWord, praise, sfx, stopAudio } from '../../lib/audio'
+import { playItem, playUrl, praise, sfx, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
-import { Item, activeGroup, groupItems, randomSyllableItems } from '../../lib/items'
+import { Item, groupItems, randomSyllableItems } from '../../lib/items'
+import { Selection } from '../../lib/selection'
 import { canRecord, startRecording } from '../../lib/recorder'
 import { canRecognize, heardMatches, listen } from '../../lib/speech'
-import { finishSession, getLearner, recordAnswer, startSession } from '../../lib/supabase'
+import { finishSession, recordAnswer, startSession } from '../../lib/supabase'
 import { Confetti } from '../ui/Confetti'
 import { FinishScreen } from '../ui/FinishScreen'
 import { Stars } from '../ui/Stars'
 
 const GAME_TYPE = 'read_aloud'
 const RANDOM_ROUNDS = 10
-const MAX_GROUP_ROUNDS = 15
 const MAX_TRIES = 3
+/** After this many attempts where the recognizer heard nothing, a grown-up decides. */
+const MAX_EMPTY = 2
+
+/**
+ * Recording his voice while the recognizer listens needs the mic twice. Phones and
+ * Safari give it to only one of them, and then the recognizer hears nothing — so there
+ * we only recognize. Desktop Chrome/Edge handle both.
+ */
+const SHARED_MIC_OK = (() => {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  const mobile = /Android|iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const safari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|Edg/.test(ua)
+  return !mobile && !safari
+})()
+
+const ERROR_TEXT: Record<string, string> = {
+  'not-allowed': 'צריך לאשר גישה למיקרופון בדפדפן',
+  'service-not-allowed': 'צריך לאשר גישה למיקרופון בדפדפן',
+  'language-not-supported': 'זיהוי קול בעברית לא זמין במכשיר הזה',
+  network: 'אין חיבור לשירות זיהוי הקול',
+  'audio-capture': 'המיקרופון לא זמין',
+}
 
 type Phase = 'look' | 'listening' | 'judge' | 'right' | 'wrong'
 
-type Props = { onExit: () => void; onRestart: () => void }
+type Props = {
+  selection: Selection
+  onExit: () => void
+  onRestart: () => void
+  onPlayGroup: (groupId: string) => void
+}
 
-export function ReadAloudGame({ onExit, onRestart }: Props) {
+export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Props) {
   const [items, setItems] = useState<Item[] | null>(null)
   const [groupName, setGroupName] = useState<string | null>(null)
   const [index, setIndex] = useState(0)
@@ -26,6 +54,7 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
   const [tries, setTries] = useState(0)
   const [heard, setHeard] = useState<string>('')
   const [notice, setNotice] = useState<string | null>(null)
+  const [empties, setEmpties] = useState(0)
   const [myVoice, setMyVoice] = useState<string | null>(null)
   const [score, setScore] = useState(0)
   const [done, setDone] = useState(false)
@@ -34,26 +63,26 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
   const sessionId = useRef<Promise<string | null> | null>(null)
   const details = useRef<unknown[]>([])
   const scoreRef = useRef(0)
-  // Some phones can't record and recognize at the same time; drop the recording then.
-  const recordAlongside = useRef(canRecord)
+  const recordAlongside = useRef(canRecord && (SHARED_MIC_OK || !canRecognize))
   const stopListening = useRef<() => void>(() => {})
 
   useEffect(() => {
     sessionId.current ??= startSession(GAME_TYPE)
-    void Promise.all([ensureContent(), getLearner()]).then(([content, learner]) => {
-      const group = activeGroup(content, learner)
-      if (group) {
-        setItems(groupItems(group).slice(0, MAX_GROUP_ROUNDS))
+    void ensureContent().then((content) => {
+      const group =
+        selection.kind === 'group' ? content.groups.find((g) => g.id === selection.groupId) : null
+      if (group && group.words.length) {
+        setItems(groupItems(group))
         setGroupName(group.name)
       } else {
-        setItems(randomSyllableItems(RANDOM_ROUNDS))
+        setItems(randomSyllableItems(RANDOM_ROUNDS, selection.kind === 'singles' ? selection.nikudIds : undefined))
       }
     })
     return () => {
       stopListening.current()
       stopAudio()
     }
-  }, [])
+  }, [selection])
 
   // Free the previous attempt's audio.
   useEffect(() => {
@@ -103,6 +132,7 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
     setMyVoice(null)
     setHeard('')
     setTries(0)
+    setEmpties(0)
     if (index + 1 >= total) {
       setDone(true)
       void sessionId.current?.then((id) => finishSession(id, total, scoreRef.current, details.current))
@@ -147,23 +177,24 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
     const blob = rec ? await rec.stop() : null
     if (blob && blob.size) setMyVoice(URL.createObjectURL(blob))
 
-    if (result.error === 'audio-capture' && rec) recordAlongside.current = false
     if (!result.alternatives.length) {
-      if (!result.error || result.error === 'no-speech' || result.error === 'aborted') {
+      // Recording alongside may have taken the mic from the recognizer: stop doing that.
+      if (rec) recordAlongside.current = false
+      const code = result.error ?? 'empty'
+      const soft = !result.error || result.error === 'no-speech' || result.error === 'aborted'
+      if (soft && empties + 1 < MAX_EMPTY) {
         // Heard nothing: let him try again without counting it.
-        setNotice('לא שמעתי, ננסה שוב?')
+        setEmpties((n) => n + 1)
+        setNotice(`לא שמעתי, ננסה שוב? (${code})`)
         setPhase('look')
       } else {
-        // The recognizer itself failed (no permission, no network…): a grown-up decides.
-        setNotice(
-          result.error === 'not-allowed' || result.error === 'service-not-allowed'
-            ? 'צריך לאשר גישה למיקרופון בדפדפן'
-            : 'זיהוי הקול לא זמין כרגע',
-        )
+        // The recognizer keeps failing (no permission, no network, silence…): a grown-up decides.
+        setNotice(`${ERROR_TEXT[code] ?? 'הזיהוי לא שמע'} (${code})`)
         setPhase('judge')
       }
       return
     }
+    setEmpties(0)
     setHeard(result.alternatives[0])
     finishItem(heardMatches(result.alternatives, item.syllables), 'speech')
   }
@@ -173,9 +204,11 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
       <FinishScreen
         score={score}
         total={total}
+        groupId={selection.kind === 'group' && groupName ? selection.groupId : null}
         groupName={groupName}
         onRestart={onRestart}
         onExit={onExit}
+        onPlayGroup={onPlayGroup}
       />
     )
 
@@ -202,7 +235,7 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
             <button className="round-btn mic" onClick={() => void startTurn()} aria-label="עכשיו אני">
               🎤
             </button>
-            <button className="round-btn listen-small" onClick={() => void playWord(item)} aria-label="שמע">
+            <button className="round-btn listen-small" onClick={() => void playItem(item)} aria-label="שמע">
               🔊
             </button>
           </div>
@@ -237,6 +270,11 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
               ✗ עוד לא
             </button>
           </div>
+          {canRecognize && (
+            <button className="parent-link" onClick={() => void startTurn()}>
+              🎤 לנסות שוב את זיהוי הקול
+            </button>
+          )}
         </div>
       )}
 
@@ -250,7 +288,7 @@ export function ReadAloudGame({ onExit, onRestart }: Props) {
                 ▶ אני
               </button>
             )}
-            <button className="btn" onClick={() => void playWord(item)}>
+            <button className="btn" onClick={() => void playItem(item)}>
               🔊 איך אומרים
             </button>
           </div>

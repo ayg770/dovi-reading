@@ -9,6 +9,7 @@ import {
   wordSpeechText,
 } from '../data/hebrew'
 import { praiseUrls, recordedSyllableUrl } from './content'
+import { Item, asSyllable } from './items'
 import { storageUrl } from './supabase'
 
 const BASE = import.meta.env.BASE_URL
@@ -198,3 +199,10 @@ export async function praise(chance = 1) {
 
 // Voices load asynchronously in Chrome.
 if ('speechSynthesis' in window) window.speechSynthesis.getVoices()
+
+/** Any game item: a single syllable uses the syllable recordings, anything longer is a word. */
+export async function playItem(item: Item) {
+  const s = asSyllable(item)
+  if (s) return playSyllable(s)
+  return playWord(item)
+}

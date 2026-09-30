@@ -33,7 +33,8 @@ export function listen(): Listening {
   if (!Recognition) return { result: Promise.resolve({ alternatives: [], error: 'unsupported' }), stop() {} }
   const r = new Recognition()
   r.lang = 'he-IL'
-  r.interimResults = false
+  // Short syllables often end before a "final" result; keep interim guesses too.
+  r.interimResults = true
   r.maxAlternatives = 5
   r.continuous = false
   const alternatives: string[] = []
@@ -41,7 +42,10 @@ export function listen(): Listening {
   const result = new Promise<Heard>((resolve) => {
     r.onresult = (e) => {
       for (const res of Array.from(e.results))
-        for (const alt of Array.from(res)) alternatives.push(alt.transcript)
+        for (const alt of Array.from(res)) {
+          const t = alt.transcript.trim()
+          if (t && !alternatives.includes(t)) alternatives.push(t)
+        }
     }
     r.onerror = (e) => {
       error = e.error
@@ -148,32 +152,35 @@ export function expectedSpellings(syllables: WordSyllable[]): string[] {
   return product(parts).map(normalize).filter(Boolean)
 }
 
-function editDistance(a: string, b: string): number {
-  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)])
-  for (let j = 1; j <= b.length; j++) dp[0][j] = j
-  for (let i = 1; i <= a.length; i++)
-    for (let j = 1; j <= b.length; j++)
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
-      )
-  return dp[a.length][b.length]
+/** Vowel letters carry the nikud sound (ו = o/u, י = i …), so a slip there is not forgiven. */
+const VOWEL_LETTERS = new Set(['ו', 'י', 'א', 'ה', 'ע'])
+
+/** Same length, exactly one different letter, and both letters are consonants. */
+function oneConsonantSlip(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diffs = 0
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) continue
+    if (++diffs > 1 || VOWEL_LETTERS.has(a[i]) || VOWEL_LETTERS.has(b[i])) return false
+  }
+  return diffs === 1
 }
 
 /**
  * Does any recognizer alternative sound like the target? A child may repeat
  * the syllable ("בו בו"), so it is enough for a word of what he said to match, or
- * for everything he said to match with spaces removed. Longer words allow one slip.
+ * for everything he said to match with spaces removed. Spellings of 4+ letters forgive one
+ * misheard consonant (never a vowel letter — that is what tells kamatz from patach).
  */
 export function heardMatches(heard: string[], syllables: WordSyllable[]): boolean {
-  const targets = expectedSpellings(syllables)
-  const letters = syllables.reduce((n, s) => n + normalize(s.text).length, 0)
-  const tolerance = letters >= 4 ? 1 : 0
+  // The recognizer writes real words in their dictionary spelling whatever the accent
+  // ("שלום" for sholom), so the word's own spelling without nikud counts too.
+  const plain = normalize(syllables.map((s) => s.text).join(''))
+  const targets = [...expectedSpellings(syllables), plain]
   for (const alt of heard) {
     const candidates = [normalize(alt), ...alt.split(/\s+/).map(normalize)].filter(Boolean)
     for (const c of candidates)
-      for (const t of targets) if (c === t || (tolerance && editDistance(c, t) <= tolerance)) return true
+      for (const t of targets) if (c === t || (t.length >= 4 && oneConsonantSlip(c, t))) return true
   }
   return false
 }

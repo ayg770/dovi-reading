@@ -41,26 +41,27 @@ export function groupItems(group: Group): Item[] {
   }))
 }
 
-export function randomSyllableItems(count: number): Item[] {
+export function randomSyllableItems(count: number, nikudIds: number[] = NIKUD.map((n) => n.id)): Item[] {
+  const nikuds = NIKUD.filter((n) => nikudIds.includes(n.id))
   const items: Item[] = []
   while (items.length < count) {
     const letter = SYLLABLE_LETTERS[Math.floor(Math.random() * SYLLABLE_LETTERS.length)]
-    const nikud = NIKUD[Math.floor(Math.random() * NIKUD.length)]
+    const nikud = nikuds[Math.floor(Math.random() * nikuds.length)]
     const item = syllableItem({ letter, nikud })
     if (!items.some((i) => i.key === item.key)) items.push(item)
   }
   return items
 }
 
-/** The letter+nikud syllables that appear in a group — the pool for the listening game. */
-export function groupSyllables(group: Group): Syllable[] {
-  const out: Syllable[] = []
-  for (const w of group.words)
-    for (const s of w.syllables) {
-      const letter = LETTERS.find((l) => l.id === s.letter_id && !l.isFinal)
-      const nikud = NIKUD.find((n) => n.id === s.nikud_id)
-      if (letter && nikud && !out.some((o) => o.letter.id === letter.id && o.nikud.id === nikud.id))
-        out.push({ letter, nikud })
-    }
-  return out
+/** The letter+nikud of a one-syllable item, so it can use syllable recordings and the letter hint. */
+export function asSyllable(item: Item): Syllable | null {
+  if (item.syllables.length !== 1) return null
+  const s = item.syllables[0]
+  const letter = LETTERS.find((l) => l.id === s.letter_id)
+  const nikud = NIKUD.find((n) => n.id === s.nikud_id)
+  if (!letter || !nikud) return null
+  const plain = (letter.dagesh ?? letter.glyph) + nikud.mark
+  const bare = letter.glyph + nikud.mark
+  const t = item.text.normalize('NFC')
+  return t === plain.normalize('NFC') || t === bare.normalize('NFC') ? { letter, nikud } : null
 }
