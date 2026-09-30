@@ -82,7 +82,7 @@ export function lockParent() {
 
 export const LEARNER_NAME = 'דובי'
 
-export type Learner = { id: string; current_group_id: string | null }
+export type Learner = { id: string; current_group_id: string | null; stars: number }
 
 let learnerPromise: Promise<Learner | null> | null = null
 
@@ -91,7 +91,7 @@ export function getLearner(): Promise<Learner | null> {
     if (!supabase) return null
     const { data, error } = await supabase
       .from('users')
-      .select('id, current_group_id')
+      .select('id, current_group_id, stars')
       .eq('name', LEARNER_NAME)
       .limit(1)
       .maybeSingle()
@@ -163,6 +163,15 @@ export async function finishSession(
     })
     .eq('id', sessionId)
   if (error) console.warn('supabase: could not finish session', error)
+}
+
+/** Add stars to the learner; returns the new total, or null offline. */
+export async function addStars(count: number): Promise<number | null> {
+  const userId = await getLearnerId()
+  if (!supabase || !userId) return null
+  const { data, error } = await supabase.rpc('add_stars', { p_user: userId, p_count: count })
+  if (error) console.warn('supabase: could not add stars', error)
+  return typeof data === 'number' ? data : null
 }
 
 /** Save answers as the game goes, so a game left in the middle still shows what happened. */

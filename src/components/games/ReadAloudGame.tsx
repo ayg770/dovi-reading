@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { playItem, playUrl, praise, sfx, stopAudio } from '../../lib/audio'
+import { playItem, playUrl, praise, sfx, speak, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
 import { Item, groupItems, randomSyllableItems } from '../../lib/items'
 import { Selection } from '../../lib/selection'
+import { earnStar } from '../../lib/stars'
 import { Recording, canRecord, startRecording } from '../../lib/recorder'
 import { Listening, canRecognize, heardMatches, listen } from '../../lib/speech'
 import { finishSession, recordAnswer, saveSessionDetails, startSession } from '../../lib/supabase'
 import { Confetti } from '../ui/Confetti'
 import { FinishScreen } from '../ui/FinishScreen'
 import { HoldMic } from '../ui/HoldMic'
+import { StarBar } from '../ui/StarBar'
 import { Stars } from '../ui/Stars'
 
 const GAME_TYPE = 'read_aloud'
@@ -102,6 +104,18 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
     }
   }, [selection])
 
+  // He doesn't read instructions: say how it works, once per visit.
+  useEffect(() => {
+    if (!items) return
+    try {
+      if (sessionStorage.getItem('dovi-read-aloud-told')) return
+      sessionStorage.setItem('dovi-read-aloud-told', '1')
+    } catch {
+      // no storage: say it every game
+    }
+    void speak('לוחצים על המיקרופון ומחזיקים, וקוראים בקול', 0.9)
+  }, [items])
+
   // Free the previous attempt's audio.
   useEffect(() => {
     return () => {
@@ -123,6 +137,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       last.how = how
       scoreRef.current += 1
       setScore(scoreRef.current)
+      earnStar()
     } else if (firstTry) {
       for (const s of item.syllables)
         if (s.letter_id && s.nikud_id) void recordAnswer(s.letter_id, s.nikud_id, correct)
@@ -130,6 +145,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       if (correct) {
         scoreRef.current += 1
         setScore(scoreRef.current)
+        earnStar()
       }
     }
     void sessionId.current?.then((id) => saveSessionDetails(id, details.current.length, scoreRef.current, details.current))
@@ -277,8 +293,8 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
           ✕
         </button>
         <Stars total={total} filled={index} />
-        <span className="score">⭐ {score}</span>
       </header>
+      <StarBar />
       {groupName && <p className="group-tag">{groupName}</p>}
 
       <div className={`read-card ${phase === 'right' ? 'right' : phase === 'wrong' ? 'wrong' : ''}`}>
@@ -287,8 +303,8 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
 
       {(phase === 'look' || phase === 'listening') && (
         <>
-          <p className="prompt">
-            {phase === 'look' ? 'קרא בקול!' : micReady ? 'מקשיב… עזוב כשסיימת' : 'רגע…'}
+          <p className="prompt icon-prompt" aria-label={phase === 'look' ? 'קרא בקול' : 'מקשיב'}>
+            {phase === 'look' ? '👀 ⬅ 🗣️' : micReady ? <span className="listening-ear">👂</span> : '⏳'}
           </p>
           <div className="read-actions">
             <HoldMic
@@ -304,9 +320,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
               </button>
             )}
           </div>
-          {phase === 'look' && (
-            <p className="hint-text">{notice ?? 'לוחצים על 🎤 ומחזיקים בזמן שקוראים. אפשר לשמוע קודם ב-🔊'}</p>
-          )}
+          {phase === 'look' && notice && <p className="hint-text">{notice}</p>}
         </>
       )}
 
@@ -338,26 +352,32 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
 
       {(phase === 'right' || phase === 'wrong') && (
         <div className="judge">
-          <p className="prompt">{phase === 'right' ? 'יופי! 🎉' : 'כמעט! ננסה שוב?'}</p>
+          <p className="result-face" aria-label={phase === 'right' ? 'יופי' : 'כמעט'}>
+            {phase === 'right' ? '🤩' : '🤔'}
+          </p>
           {heard && <p className="heard">שמעתי: {heard}</p>}
           <div className="finish-actions">
             {myVoice && (
-              <button className="btn" onClick={() => void playUrl(myVoice)}>
-                ▶ אני
+              <button className="btn icon-btn" onClick={() => void playUrl(myVoice)} aria-label="שמע את עצמך">
+                ▶ 🧒
               </button>
             )}
-            <button className="btn" onClick={() => void playItem(item)}>
-              🔊 איך אומרים
+            <button className="btn icon-btn" onClick={() => void playItem(item)} aria-label="איך אומרים">
+              🔊
             </button>
           </div>
           <div className="finish-actions">
             {phase === 'wrong' && tries < MAX_TRIES && (
-              <button className="btn primary" onClick={() => setPhase('look')}>
-                🎤 שוב
+              <button className="btn primary icon-btn" onClick={() => setPhase('look')} aria-label="שוב">
+                🔁 🎤
               </button>
             )}
-            <button className={phase === 'right' || tries >= MAX_TRIES ? 'btn primary' : 'btn'} onClick={goNext}>
-              הבא ➜
+            <button
+              className={phase === 'right' || tries >= MAX_TRIES ? 'btn primary icon-btn' : 'btn icon-btn'}
+              onClick={goNext}
+              aria-label="הבא"
+            >
+              ⬅
             </button>
           </div>
           {phase === 'wrong' && canRecognize && (

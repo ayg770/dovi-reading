@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useContent } from '../lib/content'
 import { activeGroup } from '../lib/items'
 import { Learner, getLearner } from '../lib/supabase'
+import { AnimalCollection, StarBar } from '../components/ui/StarBar'
 
 export type GameId = 'hear_syllable' | 'read_aloud'
 
@@ -29,6 +30,7 @@ export function Home({ onPlay, onSettings }: Props) {
       <button className="settings-btn" onClick={onSettings} aria-label="הגדרות">
         ⚙️
       </button>
+      <StarBar />
       <h1>
         דובי <span>קורא</span>
       </h1>
@@ -48,6 +50,7 @@ export function Home({ onPlay, onSettings }: Props) {
           </button>
         ))}
       </div>
+      <AnimalCollection />
     </div>
   )
 }

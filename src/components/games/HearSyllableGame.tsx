@@ -5,6 +5,7 @@ import { ensureContent } from '../../lib/content'
 import { Item, asSyllable, groupItems, syllableItem } from '../../lib/items'
 import { makeQuestion, makeWordQuestion } from '../../lib/questions'
 import { Selection } from '../../lib/selection'
+import { earnStar } from '../../lib/stars'
 import {
   ProgressRow,
   finishSession,
@@ -14,6 +15,7 @@ import {
 } from '../../lib/supabase'
 import { Confetti } from '../ui/Confetti'
 import { FinishScreen } from '../ui/FinishScreen'
+import { StarBar } from '../ui/StarBar'
 import { Stars } from '../ui/Stars'
 
 const SINGLES_ROUNDS = 10
@@ -136,6 +138,7 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
       if (firstTry) {
         scoreRef.current += 1
         setScore(scoreRef.current)
+        earnStar()
       }
       setStatus('right')
       setConfetti((c) => c + 1)
@@ -175,14 +178,16 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
           ✕
         </button>
         <Stars total={total} filled={round} />
-        <span className="score">⭐ {score}</span>
       </header>
+      <StarBar />
       {groupName && <p className="group-tag">{groupName}</p>}
 
       <button className="listen" onClick={() => void playItem(question.answer)} aria-label="שמע שוב">
         🔊
       </button>
-      <p className="prompt">מה שמעת?</p>
+      <p className="prompt icon-prompt" aria-label="מה שמעת?">
+        👂 ⬅ 👆
+      </p>
 
       <div className={groupWords ? 'choices words' : 'choices'}>
         {question.choices.map((c) => {
@@ -201,7 +206,7 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
 
       {status === 'wrong' && answerSyllable && (
         <button className="hint" onClick={() => void playLetterName(answerSyllable.letter)}>
-          רמז: איזו אות? 🔤
+          💡 🔤
         </button>
       )}
     </div>

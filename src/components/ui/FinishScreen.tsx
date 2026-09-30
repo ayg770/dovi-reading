@@ -3,6 +3,7 @@ import { praise, sfx } from '../../lib/audio'
 import { refreshContent } from '../../lib/content'
 import { advanceGroup } from '../../lib/supabase'
 import { Confetti } from './Confetti'
+import { StarBar } from './StarBar'
 
 type Props = {
   score: number
@@ -41,25 +42,35 @@ export function FinishScreen({ score, total, groupId, groupName, onRestart, onEx
     <div className="game finish">
       <Confetti fire={1} big />
       <div className="big-stars">{'⭐'.repeat(stars)}</div>
-      <h2>כל הכבוד דובי!</h2>
-      <p className="finish-score">
-        {score} מתוך {total}
-      </p>
-      {groupName && <p className="finish-group">קבוצה: {groupName}</p>}
-      {canAdvance && state !== 'last' && (
-        <button className="btn next-group" disabled={state === 'busy'} onClick={() => void advance()}>
-          לקבוצה הבאה ➜
+      <div className="trophy">🏆</div>
+      <div className="earned-row" aria-label={`${score} מתוך ${total}`}>
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className={i < score ? 'earned on' : 'earned'}>
+            {i < score ? '⭐' : '•'}
+          </span>
+        ))}
+      </div>
+      {groupName && <p className="finish-group">{groupName}</p>}
+      <div className="finish-actions big">
+        {canAdvance && state !== 'last' && (
+          <button
+            className="btn next-group icon-btn"
+            disabled={state === 'busy'}
+            onClick={() => void advance()}
+            aria-label="לקבוצה הבאה"
+          >
+            ⏭️
+          </button>
+        )}
+        <button className="btn primary icon-btn" onClick={onRestart} aria-label="עוד פעם">
+          🔁
         </button>
-      )}
-      {state === 'last' && <p className="finish-group">זו הייתה הקבוצה האחרונה 🏆</p>}
-      <div className="finish-actions">
-        <button className="btn primary" onClick={onRestart}>
-          עוד פעם
-        </button>
-        <button className="btn" onClick={onExit}>
-          חזרה
+        <button className="btn icon-btn" onClick={onExit} aria-label="חזרה">
+          🏠
         </button>
       </div>
+      {state === 'last' && <p className="finish-group">🏆 🎉</p>}
+      <StarBar />
     </div>
   )
 }
