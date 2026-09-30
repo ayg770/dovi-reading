@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/components/games/HearSyllableGame.tsx","./src/components/ui/Stars.tsx","./src/data/hebrew.ts","./src/lib/audio.ts","./src/lib/questions.ts","./src/lib/supabase.ts","./src/pages/Home.tsx","./vite.config.ts"],"version":"5.9.3"}
