@@ -1,18 +1,33 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HearSyllableGame } from './components/games/HearSyllableGame'
+import { ReadAloudGame } from './components/games/ReadAloudGame'
+import { ensureContent, refreshContent } from './lib/content'
 import { GameId, Home } from './pages/Home'
+import { Settings } from './pages/Settings'
+
+type Screen = GameId | 'settings' | null
 
 export default function App() {
-  const [game, setGame] = useState<GameId | null>(null)
+  const [screen, setScreen] = useState<Screen>(null)
   const [run, setRun] = useState(0)
 
-  if (game === 'hear_syllable')
+  useEffect(() => {
+    void ensureContent()
+  }, [])
+
+  const exit = () => setScreen(null)
+  const restart = () => setRun((r) => r + 1)
+
+  if (screen === 'hear_syllable') return <HearSyllableGame key={run} onExit={exit} onRestart={restart} />
+  if (screen === 'read_aloud') return <ReadAloudGame key={run} onExit={exit} onRestart={restart} />
+  if (screen === 'settings')
     return (
-      <HearSyllableGame
-        key={run}
-        onExit={() => setGame(null)}
-        onRestart={() => setRun((r) => r + 1)}
+      <Settings
+        onExit={() => {
+          void refreshContent()
+          exit()
+        }}
       />
     )
-  return <Home onPlay={setGame} />
+  return <Home onPlay={setScreen} onSettings={() => setScreen('settings')} />
 }

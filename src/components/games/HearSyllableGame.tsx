@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Syllable, syllableText } from '../../data/hebrew'
-import { playLetterName, playSyllable, sfx } from '../../lib/audio'
+import { playLetterName, playSyllable, praise, sfx } from '../../lib/audio'
+import { ensureContent } from '../../lib/content'
+import { activeGroup, groupSyllables } from '../../lib/items'
 import { Question, makeQuestion } from '../../lib/questions'
 import {
   ProgressRow,
   finishSession,
+  getLearner,
   loadProgress,
   recordAnswer,
   startSession,
 } from '../../lib/supabase'
+import { Confetti } from '../ui/Confetti'
+import { FinishScreen } from '../ui/FinishScreen'
 import { Stars } from '../ui/Stars'
 
 const ROUNDS = 10
@@ -19,14 +24,18 @@ type Status = 'asking' | 'right' | 'wrong'
 type Props = { onExit: () => void; onRestart: () => void }
 
 export function HearSyllableGame({ onExit, onRestart }: Props) {
+  const [ready, setReady] = useState(false)
   const [progress, setProgress] = useState<ProgressRow[]>([])
+  const [pool, setPool] = useState<Syllable[]>([])
+  const [groupName, setGroupName] = useState<string | null>(null)
   const [round, setRound] = useState(0)
   const [score, setScore] = useState(0)
-  const [question, setQuestion] = useState<Question>(() => makeQuestion([], []))
+  const [question, setQuestion] = useState<Question | null>(null)
   const [status, setStatus] = useState<Status>('asking')
   const [picked, setPicked] = useState<Syllable | null>(null)
   const [firstTry, setFirstTry] = useState(true)
   const [done, setDone] = useState(false)
+  const [confetti, setConfetti] = useState(0)
 
   const sessionId = useRef<Promise<string | null> | null>(null)
   const recent = useRef<Syllable[]>([])
@@ -36,28 +45,42 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
 
   useEffect(() => {
     sessionId.current ??= startSession(GAME_TYPE)
-    loadProgress().then(setProgress)
+    void Promise.all([ensureContent(), getLearner(), loadProgress()]).then(
+      ([content, learner, rows]) => {
+        const group = activeGroup(content, learner)
+        const syllables = group ? groupSyllables(group) : []
+        // A group needs at least two syllables to make a listening question.
+        const usable = syllables.length >= 2 ? syllables : []
+        setPool(usable)
+        setGroupName(usable.length && group ? group.name : null)
+        setProgress(rows)
+        setQuestion(makeQuestion(rows, [], usable))
+        setReady(true)
+      },
+    )
   }, [])
 
   // Say the syllable whenever a new question appears.
   useEffect(() => {
-    if (!done) void playSyllable(question.answer)
+    if (question && !done) void playSyllable(question.answer)
   }, [question, done])
 
   const next = useCallback(() => {
+    if (!question) return
     if (round + 1 >= ROUNDS) {
       setDone(true)
-      sfx.finish()
       void sessionId.current?.then((id) => finishSession(id, ROUNDS, scoreRef.current, details.current))
       return
     }
     recent.current = [question.answer, ...recent.current].slice(0, 4)
     setRound((r) => r + 1)
-    setQuestion(makeQuestion(progress, recent.current))
+    setQuestion(makeQuestion(progress, recent.current, pool))
     setStatus('asking')
     setPicked(null)
     setFirstTry(true)
-  }, [round, question, progress])
+  }, [round, question, progress, pool])
+
+  if (!ready || !question) return <div className="game loading">…</div>
 
   const choose = (choice: Syllable) => {
     if (status === 'right') return
@@ -94,8 +117,10 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
         setScore(scoreRef.current)
       }
       setStatus('right')
+      setConfetti((c) => c + 1)
       sfx.correct()
-      setTimeout(next, 1400)
+      void praise(0.3)
+      setTimeout(next, 1600)
     } else {
       setStatus('wrong')
       sfx.wrong()
@@ -104,33 +129,24 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
         await playSyllable(choice)
         await new Promise((r) => setTimeout(r, 400))
         await playSyllable(answer)
-      }, 450)
+      }, 600)
     }
   }
 
-  if (done) {
-    const stars = score >= 9 ? 3 : score >= 6 ? 2 : 1
+  if (done)
     return (
-      <div className="game finish">
-        <div className="big-stars">{'⭐'.repeat(stars)}</div>
-        <h2>כל הכבוד דובי!</h2>
-        <p className="finish-score">
-          {score} מתוך {ROUNDS}
-        </p>
-        <div className="finish-actions">
-          <button className="btn primary" onClick={onRestart}>
-            עוד פעם
-          </button>
-          <button className="btn" onClick={onExit}>
-            חזרה
-          </button>
-        </div>
-      </div>
+      <FinishScreen
+        score={score}
+        total={ROUNDS}
+        groupName={groupName}
+        onRestart={onRestart}
+        onExit={onExit}
+      />
     )
-  }
 
   return (
     <div className="game">
+      <Confetti fire={confetti} />
       <header className="game-bar">
         <button className="btn small" onClick={onExit} aria-label="חזרה">
           ✕
@@ -138,6 +154,7 @@ export function HearSyllableGame({ onExit, onRestart }: Props) {
         <Stars total={ROUNDS} filled={round} />
         <span className="score">⭐ {score}</span>
       </header>
+      {groupName && <p className="group-tag">{groupName}</p>}
 
       <button
         className="listen"

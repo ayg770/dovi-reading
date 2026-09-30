@@ -20,16 +20,15 @@ const same = (a: Syllable, b: Syllable) => a.letter.id === b.letter.id && a.niku
  * Weight each syllable by how shaky it is: unseen = 3, then 1 + error rate * 4.
  * Syllables Dovi keeps missing come up more often.
  */
-function weightedAnswer(progress: ProgressRow[], recent: Syllable[]): Syllable {
+function weightedAnswer(progress: ProgressRow[], recent: Syllable[], from: Syllable[]): Syllable {
   const pool: { s: Syllable; w: number }[] = []
-  for (const letter of SYLLABLE_LETTERS) {
-    for (const nikud of NIKUD) {
-      const s = { letter, nikud }
-      if (recent.some((r) => same(r, s))) continue
-      const row = progress.find((p) => p.letter_id === letter.id && p.nikud_id === nikud.id)
-      const w = !row || row.attempts === 0 ? 3 : 1 + (1 - row.correct / row.attempts) * 4
-      pool.push({ s, w })
-    }
+  // With a small pool, only avoid the very last one.
+  const avoid = from.length > recent.length + 1 ? recent : recent.slice(0, from.length > 1 ? 1 : 0)
+  for (const s of from) {
+    if (avoid.some((r) => same(r, s))) continue
+    const row = progress.find((p) => p.letter_id === s.letter.id && p.nikud_id === s.nikud.id)
+    const w = !row || row.attempts === 0 ? 3 : 1 + (1 - row.correct / row.attempts) * 4
+    pool.push({ s, w })
   }
   let r = Math.random() * pool.reduce((sum, p) => sum + p.w, 0)
   for (const p of pool) {
@@ -43,8 +42,17 @@ function weightedAnswer(progress: ProgressRow[], recent: Syllable[]): Syllable {
  * Three choices: the answer, the same letter with another nikud (tests the vowel),
  * and a look-alike letter with the same nikud (tests the letter).
  */
-export function makeQuestion(progress: ProgressRow[], recent: Syllable[]): Question {
-  const answer = weightedAnswer(progress, recent)
+const ALL_SYLLABLES: Syllable[] = SYLLABLE_LETTERS.flatMap((letter) =>
+  NIKUD.map((nikud) => ({ letter, nikud })),
+)
+
+/** `pool`: the syllables to ask about (a group's); all syllables when empty. */
+export function makeQuestion(
+  progress: ProgressRow[],
+  recent: Syllable[],
+  pool: Syllable[] = [],
+): Question {
+  const answer = weightedAnswer(progress, recent, pool.length ? pool : ALL_SYLLABLES)
   const otherNikud = pick(NIKUD.filter((n) => n.id !== answer.nikud.id))
   const lookAlikes = similarLetters(answer.letter.glyph)
     .map((g) => LETTERS.find((l) => l.glyph === g)!)

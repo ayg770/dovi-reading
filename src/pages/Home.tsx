@@ -1,21 +1,39 @@
-export type GameId = 'hear_syllable'
+import { useEffect, useState } from 'react'
+import { useContent } from '../lib/content'
+import { activeGroup } from '../lib/items'
+import { Learner, getLearner } from '../lib/supabase'
+
+export type GameId = 'hear_syllable' | 'read_aloud'
 
 type GameCard = { id: GameId | null; icon: string; title: string; subtitle: string }
 
 const GAMES: GameCard[] = [
-  { id: 'hear_syllable', icon: '👂', title: 'שמע ובחר', subtitle: 'שומעים הברה ובוחרים' },
-  { id: null, icon: '🗣️', title: 'קרא בקול', subtitle: 'בקרוב' },
+  { id: 'hear_syllable', icon: '👂', title: 'שמע ובחר', subtitle: 'שומעים ובוחרים' },
+  { id: 'read_aloud', icon: '🗣️', title: 'קרא בקול', subtitle: 'רואים וקוראים' },
   { id: null, icon: '📖', title: 'איזו מילה?', subtitle: 'בקרוב' },
   { id: null, icon: '🔍', title: 'אותיות דומות', subtitle: 'בקרוב' },
 ]
 
-export function Home({ onPlay }: { onPlay: (id: GameId) => void }) {
+type Props = { onPlay: (id: GameId) => void; onSettings: () => void }
+
+export function Home({ onPlay, onSettings }: Props) {
+  const content = useContent()
+  const [learner, setLearner] = useState<Learner | null>(null)
+  useEffect(() => {
+    void getLearner().then(setLearner)
+  }, [content])
+  const group = activeGroup(content, learner)
+
   return (
     <div className="home">
+      <button className="settings-btn" onClick={onSettings} aria-label="הגדרות">
+        ⚙️
+      </button>
       <h1>
         דובי <span>קורא</span>
       </h1>
       <p className="nikud-row">בַּ בִּ בָּ</p>
+      {group && <p className="group-tag">⭐ {group.name}</p>}
       <div className="cards">
         {GAMES.map((g) => (
           <button

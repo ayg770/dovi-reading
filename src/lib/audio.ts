@@ -1,14 +1,25 @@
-import { Letter, Syllable, syllableKey, syllableSpeechText } from '../data/hebrew'
+import {
+  LETTERS,
+  Letter,
+  NIKUD,
+  Syllable,
+  WordSyllable,
+  syllableKey,
+  syllableSpeechText,
+  wordSpeechText,
+} from '../data/hebrew'
+import { praiseUrls, recordedSyllableUrl } from './content'
+import { storageUrl } from './supabase'
 
 const BASE = import.meta.env.BASE_URL
 
-function audioUrl(path: string): string {
+function staticUrl(path: string): string {
   return BASE + 'audio/' + path.split('/').map(encodeURIComponent).join('/')
 }
 
 let current: HTMLAudioElement | null = null
 
-function stop() {
+export function stopAudio() {
   if (current) {
     current.pause()
     current = null
@@ -16,10 +27,10 @@ function stop() {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel()
 }
 
-/** Play an mp3; resolves true if it played to the end, false if it could not load. */
-function playFile(path: string): Promise<boolean> {
+/** Play a URL; resolves true if it played to the end, false if it could not load. */
+export function playUrl(url: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const audio = new Audio(audioUrl(path))
+    const audio = new Audio(url)
     current = audio
     audio.onended = () => resolve(true)
     audio.onerror = () => resolve(false)
@@ -47,37 +58,142 @@ export function speak(text: string, rate = 0.7): Promise<void> {
 
 /** Recorded letter name (א.mp3 …), falling back to speech. */
 export async function playLetterName(letter: Letter) {
-  stop()
-  if (!(await playFile(`letters/${letter.glyph}.mp3`))) await speak(letter.name)
+  stopAudio()
+  if (!(await playUrl(staticUrl(`letters/${letter.glyph}.mp3`)))) await speak(letter.name)
 }
 
-/** Recorded syllable (syllables/bet_patach.mp3 …), falling back to speech. */
+/** Syllable: recording from the settings → file in public/audio/syllables → speech. */
 export async function playSyllable(s: Syllable) {
-  stop()
-  if (!(await playFile(`syllables/${syllableKey(s)}.mp3`))) await speak(syllableSpeechText(s))
+  stopAudio()
+  const recorded = recordedSyllableUrl(s.letter.id, s.nikud.id)
+  if (recorded && (await playUrl(recorded))) return
+  if (await playUrl(staticUrl(`syllables/${syllableKey(s)}.mp3`))) return
+  await speak(syllableSpeechText(s))
 }
 
-// Small feedback tones, generated so we need no extra files.
-let ctx: AudioContext | null = null
-function tone(freqs: number[], dur = 0.12) {
-  ctx ??= new AudioContext()
-  const t0 = ctx.currentTime
-  freqs.forEach((f, i) => {
-    const osc = ctx!.createOscillator()
-    const gain = ctx!.createGain()
-    osc.frequency.value = f
-    osc.type = 'triangle'
-    gain.gain.setValueAtTime(0.25, t0 + i * dur)
-    gain.gain.exponentialRampToValueAtTime(0.001, t0 + (i + 1) * dur)
-    osc.connect(gain).connect(ctx!.destination)
-    osc.start(t0 + i * dur)
-    osc.stop(t0 + (i + 1) * dur)
-  })
+/** An open syllable (letter + known nikud, nothing after it) that has a recording. */
+function syllableRecording(s: WordSyllable): string | null {
+  if (!s.letter_id || !s.nikud_id) return null
+  const letter = LETTERS.find((l) => l.id === s.letter_id)
+  const nikud = NIKUD.find((n) => n.id === s.nikud_id)
+  if (!letter || !nikud) return null
+  const bare = (letter.dagesh ?? letter.glyph) + nikud.mark
+  const plain = letter.glyph + nikud.mark
+  if (s.text.normalize('NFC') !== bare.normalize('NFC') && s.text.normalize('NFC') !== plain.normalize('NFC'))
+    return null
+  return recordedSyllableUrl(s.letter_id, s.nikud_id)
 }
+
+export type Playable = { text: string; syllables: WordSyllable[]; audio_path?: string | null }
+
+/**
+ * A word (or single syllable) from a group:
+ * the word's own recording → the syllable recordings one after another → speech.
+ */
+export async function playWord(w: Playable) {
+  stopAudio()
+  if (w.audio_path && (await playUrl(storageUrl(w.audio_path)))) return
+  const parts = w.syllables.map(syllableRecording)
+  if (parts.length && parts.every(Boolean)) {
+    for (const url of parts) if (!(await playUrl(url!))) break
+    return
+  }
+  await speak(wordSpeechText(w.text))
+}
+
+// ---------------------------------------------------------------------------
+// Feedback sounds, synthesized so they need no files: soft bells and gentle bloops.
+
+let ctx: AudioContext | null = null
+function audioCtx(): AudioContext {
+  ctx ??= new AudioContext()
+  if (ctx.state === 'suspended') void ctx.resume()
+  return ctx
+}
+
+/** A bell-like note: a sine with two quieter overtones and a soft decay. */
+function bell(freq: number, at: number, dur = 0.6, vol = 0.18) {
+  const c = audioCtx()
+  const t = c.currentTime + at
+  const out = c.createGain()
+  out.gain.setValueAtTime(0.0001, t)
+  out.gain.exponentialRampToValueAtTime(vol, t + 0.01)
+  out.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  out.connect(c.destination)
+  for (const [mult, level] of [
+    [1, 1],
+    [2, 0.35],
+    [3.01, 0.12],
+  ]) {
+    const osc = c.createOscillator()
+    const g = c.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = freq * mult
+    g.gain.value = level
+    osc.connect(g).connect(out)
+    osc.start(t)
+    osc.stop(t + dur)
+  }
+}
+
+/** A round "bloop" that slides in pitch — friendly, not a buzzer. */
+function bloop(from: number, to: number, at: number, dur = 0.22, vol = 0.2) {
+  const c = audioCtx()
+  const t = c.currentTime + at
+  const osc = c.createOscillator()
+  const g = c.createGain()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(from, t)
+  osc.frequency.exponentialRampToValueAtTime(to, t + dur)
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.02)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  osc.connect(g).connect(c.destination)
+  osc.start(t)
+  osc.stop(t + dur)
+}
+
+/** Tiny high twinkles after a win. */
+function sparkle(at: number, count = 6) {
+  for (let i = 0; i < count; i++) {
+    const f = 2000 + Math.random() * 2200
+    bell(f, at + i * 0.05 + Math.random() * 0.03, 0.25, 0.04)
+  }
+}
+
 export const sfx = {
-  correct: () => tone([660, 880, 1320]),
-  wrong: () => tone([300, 220], 0.18),
-  finish: () => tone([523, 659, 784, 1047, 1319], 0.14),
+  correct() {
+    bell(784, 0) // G5
+    bell(988, 0.09) // B5
+    bell(1319, 0.18, 0.9) // E6
+    sparkle(0.3)
+  },
+  wrong() {
+    bloop(420, 300, 0)
+    bloop(330, 240, 0.2, 0.28)
+  },
+  tap() {
+    bloop(600, 900, 0, 0.08, 0.08)
+  },
+  start() {
+    bloop(300, 700, 0, 0.18, 0.15)
+  },
+  finish() {
+    const notes = [523, 659, 784, 1047] // C E G C
+    notes.forEach((f, i) => bell(f, i * 0.12, 0.5))
+    ;[1047, 1319, 1568].forEach((f) => bell(f, 0.55, 1.4, 0.12))
+    sparkle(0.7, 12)
+  },
+}
+
+const PRAISE_WORDS = ['כל הכבוד!', 'יופי!', 'מצוין!', 'נהדר!', 'איזה יופי!']
+
+/** Praise out loud: a clip recorded in the settings, or the speech engine. */
+export async function praise(chance = 1) {
+  if (Math.random() > chance) return
+  const clips = praiseUrls()
+  if (clips.length && (await playUrl(clips[Math.floor(Math.random() * clips.length)]))) return
+  await speak(PRAISE_WORDS[Math.floor(Math.random() * PRAISE_WORDS.length)], 1)
 }
 
 // Voices load asynchronously in Chrome.
