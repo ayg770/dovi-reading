@@ -60,3 +60,13 @@ export function randomSyllableItems(count: number, nikudIds: number[] = NIKUD.ma
 export function asSyllable(item: Item): Syllable | null {
   return item.syllables.length === 1 ? asOpenSyllable(item.syllables[0]) : null
 }
+
+/** Two random syllables joined into a made-up word, for practicing joining syllables. */
+export function pairSyllableItems(count: number, nikudIds: number[]): Item[] {
+  const singles = randomSyllableItems(count * 2, nikudIds)
+  return Array.from({ length: count }, (_, i) => {
+    const a = singles[i * 2]
+    const b = singles[i * 2 + 1]
+    return { key: `${a.key}+${b.key}`, text: a.text + b.text, syllables: [...a.syllables, ...b.syllables] }
+  })
+}

@@ -5,13 +5,24 @@ import { Learner, getLearner } from '../lib/supabase'
 import { AnimalCollection, StarBar } from '../components/ui/StarBar'
 import { t } from '../lib/i18n'
 
-export type GameId = 'hear_syllable' | 'read_aloud' | 'read_text'
+export type GameId =
+  | 'hear_syllable'
+  | 'read_aloud'
+  | 'syllable_train'
+  | 'build_word'
+  | 'similar_letters'
+  | 'right_letter'
+  | 'read_text'
 
 type GameCard = { id: GameId | null; icon: string; title: string; subtitle: string }
 
 const GAMES: GameCard[] = [
   { id: 'hear_syllable', icon: '👂', title: t('שמע ובחר'), subtitle: t('שומעים ובוחרים') },
   { id: 'read_aloud', icon: '🗣️', title: t('קרא בקול'), subtitle: t('רואים וקוראים') },
+  { id: 'syllable_train', icon: '🚂', title: t('רכבת ההברות'), subtitle: t('מיקרופון פתוח, הרכבת נוסעת') },
+  { id: 'build_word', icon: '🧩', title: t('בנה מילה'), subtitle: t('מחברים הברות') },
+  { id: 'similar_letters', icon: '🔍', title: t('אותיות דומות'), subtitle: t('מי מהן?') },
+  { id: 'right_letter', icon: '✅', title: t('האות הנכונה'), subtitle: t('הפוכה, שבורה, או נכונה?') },
   { id: 'read_text', icon: '📖', title: t('קריאת טקסט'), subtitle: t('טקסטים משלי') },
 ]
 

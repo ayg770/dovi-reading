@@ -1383,3 +1383,218 @@ select {
   border: 2px solid #e8dfd0;
   background: white;
 }
+
+/* Letter games: copies of a letter that are wrong in some way */
+.choices.letters .choice {
+  font-size: clamp(4.5rem, 20vw, 7rem);
+}
+.glyph {
+  display: inline-block;
+  position: relative;
+  line-height: 1.1;
+}
+.glyph.mirror {
+  transform: scaleX(-1);
+}
+.glyph.flip {
+  transform: scaleY(-1);
+}
+.glyph.rotate {
+  transform: rotate(180deg);
+}
+.glyph.broken {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 38%, transparent 38% 50%, #000 50% 100%);
+  mask-image: linear-gradient(to bottom, #000 0 38%, transparent 38% 50%, #000 50% 100%);
+}
+.glyph.extras::after {
+  content: '• •';
+  position: absolute;
+  top: -0.12em;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.28em;
+  letter-spacing: 0.4em;
+}
+
+/* Build a word */
+.build {
+  gap: 14px;
+}
+.listen-row {
+  display: flex;
+  gap: 16px;
+}
+.slots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px 0;
+  transition: gap 0.5s;
+}
+.slot-box {
+  min-width: 2.2em;
+  height: 1.7em;
+  border-radius: 18px;
+  border: 4px dashed #d9cfbd;
+  display: grid;
+  place-items: center;
+  font-family: 'Frank Ruhl Libre', serif;
+  font-weight: 700;
+  font-size: clamp(2.6rem, 14vw, 4.2rem);
+  line-height: 1;
+  transition: all 0.4s;
+  background: rgba(255, 255, 255, 0.5);
+}
+.slot-box.full {
+  border-style: solid;
+  border-color: var(--right);
+  background: #e6f8ee;
+}
+.slot-box.lit {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.slots.joined {
+  gap: 0;
+  animation: pop 0.6s;
+}
+.slots.joined .slot-box {
+  border-radius: 0;
+  border-width: 4px 0;
+  min-width: 1.4em;
+  background: #e6f8ee;
+}
+.slots.joined .slot-box:first-child {
+  border-radius: 0 18px 18px 0;
+  border-right-width: 4px;
+}
+.slots.joined .slot-box:last-child {
+  border-radius: 18px 0 0 18px;
+  border-left-width: 4px;
+}
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.tile {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 8px 20px;
+  font-family: 'Frank Ruhl Libre', serif;
+  font-weight: 700;
+  font-size: clamp(2.4rem, 12vw, 3.6rem);
+  line-height: 1.3;
+  border: 4px solid transparent;
+  transition: transform 0.15s, opacity 0.3s;
+}
+.tile:active:not(:disabled) {
+  transform: translateY(4px);
+}
+.tile.used {
+  opacity: 0.15;
+  transform: scale(0.8);
+}
+.tile.wrong {
+  border-color: var(--wrong);
+  background: #ffeaea;
+  animation: shake 0.4s;
+}
+
+/* Syllable train */
+.train {
+  gap: 14px;
+}
+.track {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  width: calc(100% + 32px);
+  margin: 0 -16px;
+  padding: 24px 40vw 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-height: 190px;
+  background: linear-gradient(to bottom, transparent 82%, #c8b99f 82% 86%, transparent 86%);
+}
+.track::-webkit-scrollbar {
+  display: none;
+}
+.engine {
+  font-size: 4.5rem;
+  flex: none;
+  line-height: 1;
+  padding-bottom: 18px;
+}
+.car {
+  flex: none;
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  border: 4px solid #e8dfd0;
+  padding: 10px 22px 0;
+  text-align: center;
+  transition: transform 0.3s, border-color 0.3s, background 0.3s, opacity 0.3s;
+  opacity: 0.75;
+}
+.car-text {
+  display: block;
+  font-family: 'Frank Ruhl Libre', serif;
+  font-weight: 700;
+  font-size: clamp(2.6rem, 12vw, 3.6rem);
+  line-height: 1.3;
+}
+.wheels {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.6em;
+  margin-bottom: -0.5rem;
+}
+.car.on {
+  opacity: 1;
+  transform: scale(1.12) translateY(-6px);
+  border-color: var(--accent);
+}
+.car.ok {
+  background: #e6f8ee;
+  border-color: var(--right);
+  opacity: 1;
+}
+.car.skip {
+  background: #eee9df;
+  opacity: 0.5;
+}
+.car.miss {
+  background: #ffeaea;
+  border-color: var(--wrong);
+  animation: shake 0.4s;
+}
+.mic-light {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.8rem;
+  padding: 6px 16px;
+  background: var(--card);
+  border-radius: 999px;
+  box-shadow: 0 2px 0 rgba(43, 33, 64, 0.1);
+}
+.mic-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #c9c0b2;
+}
+.mic-light.listening .mic-dot {
+  background: var(--right);
+  animation: pulse 1s ease-in-out infinite;
+}
+.mic-light.restarting .mic-dot {
+  background: var(--accent);
+}
+.mic-light.error .mic-dot {
+  background: var(--wrong);
+}

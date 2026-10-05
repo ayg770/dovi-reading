@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { HearSyllableGame } from './components/games/HearSyllableGame'
 import { ReadAloudGame } from './components/games/ReadAloudGame'
+import { BuildWordGame } from './components/games/BuildWordGame'
+import { LetterGame } from './components/games/LetterGame'
 import { TextAutoGame } from './components/games/TextAutoGame'
+import { TrainGame } from './components/games/TrainGame'
 import { ContentPicker } from './components/ui/ContentPicker'
 import { TextPicker } from './components/ui/TextPicker'
 import { getLang, setLang, t } from './lib/i18n'
@@ -14,16 +17,22 @@ import { Settings } from './pages/Settings'
 import { Welcome } from './pages/Welcome'
 import { getLearner } from './lib/supabase'
 
-const TITLES: Record<Exclude<GameId, 'read_text'>, { title: string; icon: string }> = {
+/** Games that start with choosing what to play (single syllables or a group). */
+const TITLES = {
   hear_syllable: { title: t('שמע ובחר'), icon: '👂' },
   read_aloud: { title: t('קרא בקול'), icon: '🗣️' },
+  syllable_train: { title: t('רכבת ההברות'), icon: '🚂' },
+  build_word: { title: t('בנה מילה'), icon: '🧩' },
 }
+type PickedGame = keyof typeof TITLES
+const isPicked = (g: GameId): g is PickedGame => g in TITLES
 
 type Screen =
   | { kind: 'home' }
   | { kind: 'settings' }
-  | { kind: 'pick'; game: Exclude<GameId, 'read_text'> }
-  | { kind: 'play'; game: Exclude<GameId, 'read_text'>; selection: Selection }
+  | { kind: 'pick'; game: PickedGame }
+  | { kind: 'play'; game: PickedGame; selection: Selection }
+  | { kind: 'letters'; mode: 'similar' | 'right' }
   | { kind: 'text-pick' }
   | { kind: 'text-auto'; groupId: string; pace: number }
 
@@ -83,6 +92,9 @@ export default function App() {
       <TextAutoGame key={run} groupId={screen.groupId} pace={screen.pace} onExit={home} onRestart={() => setRun((r) => r + 1)} />
     )
 
+  if (screen.kind === 'letters')
+    return <LetterGame key={run} mode={screen.mode} onExit={home} onRestart={() => setRun((r) => r + 1)} />
+
   if (screen.kind === 'pick')
     return (
       <ContentPicker
@@ -106,13 +118,21 @@ export default function App() {
         setRun((r) => r + 1)
       },
     }
-    return screen.game === 'hear_syllable' ? <HearSyllableGame {...props} /> : <ReadAloudGame {...props} />
+    if (screen.game === 'hear_syllable') return <HearSyllableGame {...props} />
+    if (screen.game === 'read_aloud') return <ReadAloudGame {...props} />
+    if (screen.game === 'syllable_train') return <TrainGame {...props} />
+    return <BuildWordGame {...props} />
   }
 
   return (
     <Home
       userName={account.name}
-      onPlay={(game) => setScreen(game === 'read_text' ? { kind: 'text-pick' } : { kind: 'pick', game })}
+      onPlay={(game) => {
+        if (game === 'read_text') setScreen({ kind: 'text-pick' })
+        else if (game === 'similar_letters') setScreen({ kind: 'letters', mode: 'similar' })
+        else if (game === 'right_letter') setScreen({ kind: 'letters', mode: 'right' })
+        else if (isPicked(game)) setScreen({ kind: 'pick', game })
+      }}
       onSettings={() => setScreen({ kind: 'settings' })}
       onSwitchUser={() => switchAccount(null)}
     />

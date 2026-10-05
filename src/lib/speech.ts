@@ -11,7 +11,9 @@ type RecognitionCtor = new () => {
   start: () => void
   stop: () => void
   abort: () => void
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onresult:
+    | ((e: { resultIndex: number; results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void)
+    | null
   onerror: ((e: { error: string }) => void) | null
   onend: (() => void) | null
   onaudiostart: (() => void) | null
@@ -66,6 +68,78 @@ export function listen(onReady?: () => void): Listening {
   })
   r.start()
   return { result, stop: () => r.stop(), abort: () => r.abort() }
+}
+
+export type StreamState = 'listening' | 'restarting' | 'error'
+
+export type Stream = { stop: () => void }
+
+const FATAL = new Set(['not-allowed', 'service-not-allowed', 'language-not-supported', 'audio-capture'])
+
+/**
+ * Keep listening for as long as needed: what is heard arrives as it comes (`onHeard`, with
+ * the result's index so the same utterance isn't counted twice). The recognizer stops itself
+ * after silence or a few minutes, so it is started again each time — except on errors that
+ * would only repeat (no permission, no microphone).
+ */
+export function streamListen(handlers: {
+  onHeard: (alternatives: string[], isFinal: boolean, resultIndex: number) => void
+  onState: (state: StreamState, error?: string) => void
+}): Stream {
+  if (!Recognition) {
+    handlers.onState('error', 'unsupported')
+    return { stop() {} }
+  }
+  let stopped = false
+  let current: InstanceType<RecognitionCtor> | null = null
+  let lastError: string | undefined
+  let restarts = 0
+
+  const begin = () => {
+    if (stopped) return
+    const r = new Recognition!()
+    current = r
+    lastError = undefined
+    r.lang = 'he-IL'
+    r.continuous = true
+    r.interimResults = true
+    r.maxAlternatives = 5
+    r.onaudiostart = () => {
+      restarts = 0
+      handlers.onState('listening')
+    }
+    r.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const res = e.results[i]
+        const alts = Array.from(res)
+          .map((a) => a.transcript.trim())
+          .filter(Boolean)
+        if (alts.length) handlers.onHeard(alts, res.isFinal, i)
+      }
+    }
+    r.onerror = (e) => {
+      lastError = e.error
+    }
+    r.onend = () => {
+      if (stopped) return
+      if (lastError && FATAL.has(lastError)) return handlers.onState('error', lastError)
+      if (++restarts > 40) return handlers.onState('error', 'too-many-restarts')
+      handlers.onState('restarting')
+      window.setTimeout(begin, 250)
+    }
+    try {
+      r.start()
+    } catch {
+      window.setTimeout(begin, 400)
+    }
+  }
+  begin()
+  return {
+    stop() {
+      stopped = true
+      current?.abort()
+    },
+  }
 }
 
 // ---------------------------------------------------------------------------

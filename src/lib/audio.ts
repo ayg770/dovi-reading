@@ -210,7 +210,7 @@ export async function playItem(item: Item) {
 }
 
 /** One syllable of a word: its recording if there is one, else the speech engine. */
-async function playWordSyllable(ws: WordSyllable) {
+export async function playWordSyllable(ws: WordSyllable) {
   const url = syllableRecording(ws)
   if (url && (await playUrl(url))) return
   await speak(wordSpeechText(ws.text), 0.6)
