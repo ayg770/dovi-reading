@@ -57,8 +57,8 @@ alter table public.word_groups alter column user_id set not null;
 alter table public.words alter column user_id set not null;
 alter table public.praise_clips alter column user_id set not null;
 
-alter table public.recordings drop constraint recordings_letter_id_nikud_id_pronunciation_key;
 alter table public.recordings add constraint recordings_owner_key unique (user_id, letter_id, nikud_id, pronunciation);
+alter table public.recordings drop constraint recordings_letter_id_nikud_id_pronunciation_key;
 
 create index word_groups_user_idx on public.word_groups (user_id, sort_order);
 create index words_user_idx on public.words (user_id);
@@ -72,46 +72,56 @@ insert into app_private.settings (key, value)
 select 'template_user_id', id::text from public.users where name = 'דובי';
 
 -- 4. Row level security: own rows only ----------------------------------------------
-drop policy "read users" on public.users;
-drop policy "parent updates users" on public.users;
-drop policy "read groups" on public.word_groups;
-drop policy "parent writes groups" on public.word_groups;
-drop policy "read words" on public.words;
-drop policy "parent writes words" on public.words;
-drop policy "read recordings" on public.recordings;
-drop policy "parent writes recordings" on public.recordings;
-drop policy "read praise" on public.praise_clips;
-drop policy "parent writes praise" on public.praise_clips;
-drop policy "read sessions" on public.game_sessions;
-drop policy "insert sessions" on public.game_sessions;
-drop policy "finish sessions" on public.game_sessions;
-drop policy "read progress" on public.progress;
-drop policy "insert progress" on public.progress;
-drop policy "update progress" on public.progress;
-
--- The code hash and the star count are never read or written directly.
+-- Applied as ALTER POLICY (rename + new condition) on the existing policies.
 revoke select, insert, update, delete on public.users from anon, authenticated;
 grant select (id, name, pronunciation, current_group_id, stars, created_at) on public.users to anon, authenticated;
 grant update (name, pronunciation, current_group_id) on public.users to anon, authenticated;
 
-create policy "own user" on public.users for select to anon, authenticated
-  using (id = (select public.current_user_id()));
-create policy "own user update" on public.users for update to anon, authenticated
+alter policy "read users" on public.users rename to "own user";
+alter policy "own user" on public.users using (id = (select public.current_user_id()));
+alter policy "parent updates users" on public.users rename to "own user update";
+alter policy "own user update" on public.users
   using (id = (select public.current_user_id())) with check (id = (select public.current_user_id()));
 
-create policy "own groups" on public.word_groups for all to anon, authenticated
+alter policy "read groups" on public.word_groups rename to "own groups read";
+alter policy "own groups read" on public.word_groups using (user_id = (select public.current_user_id()));
+alter policy "parent writes groups" on public.word_groups rename to "own groups";
+alter policy "own groups" on public.word_groups
   using (user_id = (select public.current_user_id())) with check (user_id = (select public.current_user_id()));
-create policy "own words" on public.words for all to anon, authenticated
+
+alter policy "read words" on public.words rename to "own words read";
+alter policy "own words read" on public.words using (user_id = (select public.current_user_id()));
+alter policy "parent writes words" on public.words rename to "own words";
+alter policy "own words" on public.words
   using (user_id = (select public.current_user_id())) with check (user_id = (select public.current_user_id()));
-create policy "own praise" on public.praise_clips for all to anon, authenticated
+
+alter policy "read praise" on public.praise_clips rename to "own praise read";
+alter policy "own praise read" on public.praise_clips using (user_id = (select public.current_user_id()));
+alter policy "parent writes praise" on public.praise_clips rename to "own praise";
+alter policy "own praise" on public.praise_clips
   using (user_id = (select public.current_user_id())) with check (user_id = (select public.current_user_id()));
-create policy "shared recordings" on public.recordings for select to anon, authenticated
-  using (user_id is null);
-create policy "own recordings" on public.recordings for all to anon, authenticated
+
+alter policy "read recordings" on public.recordings rename to "shared or own recordings";
+alter policy "shared or own recordings" on public.recordings
+  using (user_id is null or user_id = (select public.current_user_id()));
+alter policy "parent writes recordings" on public.recordings rename to "own recordings";
+alter policy "own recordings" on public.recordings
   using (user_id = (select public.current_user_id())) with check (user_id = (select public.current_user_id()));
-create policy "own sessions" on public.game_sessions for all to anon, authenticated
+
+alter policy "read sessions" on public.game_sessions rename to "own sessions read";
+alter policy "own sessions read" on public.game_sessions using (user_id = (select public.current_user_id()));
+alter policy "insert sessions" on public.game_sessions rename to "own sessions insert";
+alter policy "own sessions insert" on public.game_sessions with check (user_id = (select public.current_user_id()));
+alter policy "finish sessions" on public.game_sessions rename to "own sessions update";
+alter policy "own sessions update" on public.game_sessions
   using (user_id = (select public.current_user_id())) with check (user_id = (select public.current_user_id()));
-create policy "own progress" on public.progress for all to anon, authenticated
+
+alter policy "read progress" on public.progress rename to "own progress read";
+alter policy "own progress read" on public.progress using (user_id = (select public.current_user_id()));
+alter policy "insert progress" on public.progress rename to "own progress insert";
+alter policy "own progress insert" on public.progress with check (user_id = (select public.current_user_id()));
+alter policy "update progress" on public.progress rename to "own progress update";
+alter policy "own progress update" on public.progress
   using (user_id = (select public.current_user_id())) with check (user_id = (select public.current_user_id()));
 
 -- 5. Account functions --------------------------------------------------------------
@@ -239,19 +249,21 @@ begin
 end;
 $$;
 
--- 6. The single parent code is gone -------------------------------------------------
-drop function public.is_parent();
-drop function public.parent_pin_exists();
-drop function public.check_parent_pin(text);
-drop function public.set_parent_pin(text);
-drop table app_private.parent_pin;
+-- 6. The single parent code no longer grants anything ----------------------------
+-- (its table and functions are left in place, inert)
+create or replace function public.is_parent()
+returns boolean language sql stable set search_path = '' as $$ select false; $$;
+revoke execute on function public.set_parent_pin(text) from anon, authenticated;
+revoke execute on function public.check_parent_pin(text) from anon, authenticated;
+revoke execute on function public.parent_pin_exists() from anon, authenticated;
 
 -- 7. Recordings are private: each user's files live under their own id -------------
 update storage.buckets set public = false where id = 'audio';
-drop policy "audio read" on storage.objects;
-drop policy "audio parent insert" on storage.objects;
-drop policy "audio parent update" on storage.objects;
-drop policy "audio parent delete" on storage.objects;
 create policy "own audio" on storage.objects for all to anon, authenticated
   using (bucket_id = 'audio' and (storage.foldername(name))[1] = (select public.current_user_id())::text)
   with check (bucket_id = 'audio' and (storage.foldername(name))[1] = (select public.current_user_id())::text);
+-- The old open "audio read" policy can't be dropped from here (storage.objects is not
+-- ours); this restrictive policy overrides it: in the audio bucket, only your own files.
+create policy "audio only own" on storage.objects as restrictive for all to anon, authenticated
+  using (bucket_id <> 'audio' or (storage.foldername(name))[1] = (select public.current_user_id())::text)
+  with check (bucket_id <> 'audio' or (storage.foldername(name))[1] = (select public.current_user_id())::text);
