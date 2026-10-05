@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useContent } from '../lib/content'
 import { activeGroup } from '../lib/items'
 import { Learner, getLearner } from '../lib/supabase'
+import { JourneyMap } from '../components/ui/JourneyMap'
 import { AnimalCollection, StarBar } from '../components/ui/StarBar'
 import { t } from '../lib/i18n'
 
@@ -58,6 +59,7 @@ export function Home({ userName, onPlay, onSettings, onSwitchUser }: Props) {
       </h1>
       <p className="nikud-row">בַּ בִּ בָּ</p>
       {group && <p className="group-tag">⭐ {group.name}</p>}
+      <JourneyMap />
       <div className="cards">
         {GAMES.map((g) => (
           <button

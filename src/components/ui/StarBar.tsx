@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { sfx } from '../../lib/audio'
 import {
   ANIMALS,
+  SCENES,
   STARS_PER_ANIMAL,
   animalsEarned,
   dismissNewAnimal,
-  nextAnimal,
+  sceneAt,
   useStars,
 } from '../../lib/stars'
 import { Confetti } from './Confetti'
+
+const SCENES_COUNT = SCENES.length
 import { t } from '../../lib/i18n'
 
 /**
@@ -16,7 +19,7 @@ import { t } from '../../lib/i18n'
  * (shown as a silhouette until earned), and the newest animal earned.
  */
 export function StarBar() {
-  const { stars, loaded, newAnimal } = useStars()
+  const { stars, loaded, newAnimal, newScene } = useStars()
   const [pop, setPop] = useState(false)
   const prev = useRef(stars)
 
@@ -32,8 +35,8 @@ export function StarBar() {
   }, [stars, loaded])
 
   const inRow = stars % STARS_PER_ANIMAL
-  const next = nextAnimal(stars)
   const earned = animalsEarned(stars)
+  const arrived = earned < SCENES_COUNT
   const last = earned ? ANIMALS[earned - 1] : null
 
   return (
@@ -49,21 +52,21 @@ export function StarBar() {
             </span>
           ))}
         </span>
-        {next ? (
-          <span className="star-next" title={t('החיה הבאה')}>
-            {next.emoji}
+        {arrived ? (
+          <span className="star-next" title={t('התחנה הבאה')}>
+            {sceneAt(earned + 1)}
           </span>
         ) : (
           <span className="star-next earned">🏆</span>
         )}
         {last && <span className="star-last">{last.emoji}</span>}
       </div>
-      {newAnimal && <NewAnimal emoji={newAnimal.emoji} onClose={dismissNewAnimal} />}
+      {newAnimal && <NewAnimal emoji={newAnimal.emoji} scene={newScene} onClose={dismissNewAnimal} />}
     </>
   )
 }
 
-function NewAnimal({ emoji, onClose }: { emoji: string; onClose: () => void }) {
+function NewAnimal({ emoji, scene, onClose }: { emoji: string; scene: string | null; onClose: () => void }) {
   useEffect(() => {
     sfx.finish()
     const t = setTimeout(onClose, 5000)
@@ -73,6 +76,7 @@ function NewAnimal({ emoji, onClose }: { emoji: string; onClose: () => void }) {
     <div className="new-animal" onClick={onClose}>
       <Confetti fire={1} big />
       <div className="new-animal-card">
+        {scene && <span className="new-scene">{scene}</span>}
         <span className="new-animal-emoji">{emoji}</span>
         <span className="new-animal-stars">⭐⭐⭐</span>
       </div>

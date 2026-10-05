@@ -3,9 +3,13 @@ import { speakUi } from './audio'
 import { t } from './i18n'
 import { addStars, getLearner } from './supabase'
 
-// Stars across all games, and the animals they earn: one every STARS_PER_ANIMAL.
+// Stars across all games. The journey: every STARS_PER_ANIMAL stars the traveler reaches the
+// next station, and the animal of that station joins the trip.
 
 export const STARS_PER_ANIMAL = 10
+
+/** The scenery of each station on the way; the last one is the destination. */
+export const SCENES = ['🌳', '🌲', '🌉', '🏞️', '🌾', '⛰️', '🏔️', '🏜️', '🌵', '🏖️', '🌊', '🏝️', '🌴', '🏕️', '🌋', '🏰', '🌅', '🌃', '🌄', '🏡', '⛲', '🕍']
 
 export const ANIMALS: { emoji: string; name: string }[] = [
   { emoji: '🐶', name: 'כלב' },
@@ -41,9 +45,19 @@ export function nextAnimal(stars: number) {
   return ANIMALS[animalsEarned(stars)] ?? null
 }
 
-type State = { stars: number; loaded: boolean; newAnimal: (typeof ANIMALS)[number] | null }
+/** Scenery of the station the traveler has just reached, or the home start. */
+export function sceneAt(stationsReached: number): string {
+  return stationsReached <= 0 ? '🏠' : (SCENES[stationsReached - 1] ?? '🕍')
+}
 
-let state: State = { stars: 0, loaded: false, newAnimal: null }
+type State = {
+  stars: number
+  loaded: boolean
+  newAnimal: (typeof ANIMALS)[number] | null
+  newScene: string | null
+}
+
+let state: State = { stars: 0, loaded: false, newAnimal: null, newScene: null }
 const listeners = new Set<(s: State) => void>()
 
 function set(next: Partial<State>) {
@@ -74,7 +88,7 @@ export function earnStar() {
   const before = state.stars
   const after = before + 1
   const earned = animalsEarned(after) > animalsEarned(before) ? ANIMALS[animalsEarned(after) - 1] : null
-  set({ stars: after, newAnimal: earned ?? state.newAnimal })
+  set({ stars: after, newAnimal: earned ?? state.newAnimal, newScene: earned ? sceneAt(animalsEarned(after)) : state.newScene })
   if (earned) setTimeout(() => void speakUi(t(earned.name) + '!'), 1800)
   void addStars(1).then((total) => {
     // The server's count wins if another device added stars meanwhile.
@@ -83,5 +97,5 @@ export function earnStar() {
 }
 
 export function dismissNewAnimal() {
-  set({ newAnimal: null })
+  set({ newAnimal: null, newScene: null })
 }

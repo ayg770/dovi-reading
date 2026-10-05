@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { currentPronunciation } from '../data/hebrew'
+import { currentAccount } from './account'
 import { Content, Group, Recording, loadContent, signAudio } from './supabase'
 
 // One shared copy of the content (groups, recordings, praise clips) for the whole app.
@@ -14,8 +15,34 @@ export function getContent(): Content {
   return content
 }
 
+const snapshotKey = () => `dovi-content-${currentAccount()?.id ?? 'none'}`
+
+/** The last successfully loaded groups and texts, kept on the device for when there is no connection. */
+function readSnapshot(): Content | null {
+  try {
+    const raw = localStorage.getItem(snapshotKey())
+    return raw ? (JSON.parse(raw) as Content) : null
+  } catch {
+    return null
+  }
+}
+
+function writeSnapshot(c: Content) {
+  try {
+    // Recordings are not kept: their links need a connection anyway.
+    localStorage.setItem(snapshotKey(), JSON.stringify({ groups: c.groups, texts: c.texts, recordings: [], praise: [] }))
+  } catch {
+    // storage full or blocked: no offline copy
+  }
+}
+
 export function refreshContent(): Promise<Content> {
-  loading = loadContent().then(async (c) => {
+  loading = loadContent().then(async (loaded) => {
+    let c = loaded
+    if (loaded.failed) {
+      const old = readSnapshot()
+      if (old && (old.groups.length || old.texts.length)) c = old
+    } else writeSnapshot(loaded)
     const paths = [
       ...c.recordings.filter((r) => r.source === 'storage').map((r) => r.audio_path),
       ...c.groups.flatMap((g) => g.words.map((w) => w.audio_path)),

@@ -284,6 +284,8 @@ export type Content = {
   texts: Group[]
   recordings: Recording[]
   praise: PraiseClip[]
+  /** true when the data could not be loaded (offline): what is shown may be an older copy */
+  failed?: boolean
 }
 
 export async function loadContent(): Promise<Content> {
@@ -298,8 +300,12 @@ export async function loadContent(): Promise<Content> {
     supabase.from('recordings').select('id, letter_id, nikud_id, audio_path, source, pronunciation'),
     supabase.from('praise_clips').select('id, audio_path').order('created_at'),
   ])
+  let failed = false
   for (const r of [groups, words, recordings, praise])
-    if (r.error) console.warn('supabase: could not load content', r.error)
+    if (r.error) {
+      failed = true
+      console.warn('supabase: could not load content', r.error)
+    }
   const all = (groups.data ?? []).map((g) => ({
     ...g,
     kind: g.kind as 'words' | 'text',
@@ -308,6 +314,7 @@ export async function loadContent(): Promise<Content> {
   return {
     groups: all.filter((g) => g.kind === 'words'),
     texts: all.filter((g) => g.kind === 'text'),
+    failed,
     recordings: recordings.data ?? [],
     praise: praise.data ?? [],
   }
