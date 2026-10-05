@@ -2,15 +2,16 @@
 import { LETTERS, NIKUD, currentPronunciation, hasNikud, parseText, stripNikud } from '../data/hebrew'
 import { getContent, ownRecording, refreshContent } from './content'
 import { Group, getLearnerId, removeAudio, supabase, uploadAudio } from './supabase'
+import { t } from './i18n'
 
 function db() {
-  if (!supabase) throw new Error('אין חיבור לשרת')
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
   return supabase
 }
 
 async function me(): Promise<string> {
   const id = await getLearnerId()
-  if (!id) throw new Error('אין משתמש מחובר')
+  if (!id) throw new Error(t('אין משתמש מחובר'))
   return id
 }
 
@@ -69,9 +70,9 @@ export type LineCheck = { text: string; preview: string; warning: string | null 
 export function checkLine(text: string): LineCheck {
   const syllables = parseText(text)
   let warning: string | null = null
-  if (!syllables.length) warning = 'אין אותיות עבריות'
-  else if (!hasNikud(text)) warning = 'בלי ניקוד'
-  else if (syllables.some((s) => !s.vowel && s.text.length === 1)) warning = 'אות בלי ניקוד'
+  if (!syllables.length) warning = t('אין אותיות עבריות')
+  else if (!hasNikud(text)) warning = t('בלי ניקוד')
+  else if (syllables.some((s) => !s.vowel && s.text.length === 1)) warning = t('אות בלי ניקוד')
   return { text, preview: syllables.map((s) => s.text).join('·'), warning }
 }
 

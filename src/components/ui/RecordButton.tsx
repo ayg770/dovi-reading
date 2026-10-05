@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { playUrl, stopAudio } from '../../lib/audio'
 import { Recording, canRecord, startRecording } from '../../lib/recorder'
+import { t } from '../../lib/i18n'
 
 type Props = {
   /** URL of the saved recording, if any */
@@ -45,7 +46,7 @@ export function RecordButton({ existingUrl, onSave, onDelete, maxMs = 4000 }: Pr
       const mine = rec.current
       setTimeout(() => rec.current === mine && void finish(), maxMs + 50)
     } catch {
-      setError('אין גישה למיקרופון')
+      setError(t('אין גישה למיקרופון'))
     }
   }
 
@@ -67,18 +68,18 @@ export function RecordButton({ existingUrl, onSave, onDelete, maxMs = 4000 }: Pr
       setPreviewUrl(null)
       setState('idle')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'השמירה נכשלה')
+      setError(e instanceof Error ? e.message : t('השמירה נכשלה'))
       setState('preview')
     }
   }
 
   const remove = async () => {
-    if (!onDelete || !confirm('למחוק את ההקלטה?')) return
+    if (!onDelete || !confirm(t('למחוק את ההקלטה?'))) return
     setState('saving')
     try {
       await onDelete()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'המחיקה נכשלה')
+      setError(e instanceof Error ? e.message : t('המחיקה נכשלה'))
     }
     setState('idle')
   }
@@ -88,20 +89,20 @@ export function RecordButton({ existingUrl, onSave, onDelete, maxMs = 4000 }: Pr
       {state === 'idle' && (
         <>
           {existingUrl && (
-            <button className="rec-btn" onClick={() => void playUrl(existingUrl)} title="השמע">
+            <button className="rec-btn" onClick={() => void playUrl(existingUrl)} title={t('השמע')}>
               ▶
             </button>
           )}
           {canRecord && (
-            <button className="rec-btn record" onClick={() => void start()} title="הקלט">
+            <button className="rec-btn record" onClick={() => void start()} title={t('הקלט')}>
               🎙️
             </button>
           )}
-          <button className="rec-btn" onClick={() => fileInput.current?.click()} title="העלה קובץ">
+          <button className="rec-btn" onClick={() => fileInput.current?.click()} title={t('העלה קובץ')}>
             📁
           </button>
           {existingUrl && onDelete && (
-            <button className="rec-btn" onClick={() => void remove()} title="מחק">
+            <button className="rec-btn" onClick={() => void remove()} title={t('מחק')}>
               🗑
             </button>
           )}
@@ -119,16 +120,16 @@ export function RecordButton({ existingUrl, onSave, onDelete, maxMs = 4000 }: Pr
         </>
       )}
       {state === 'recording' && (
-        <button className="rec-btn stop" onClick={() => void finish()} title="עצור">
+        <button className="rec-btn stop" onClick={() => void finish()} title={t('עצור')}>
           ⏹
         </button>
       )}
       {state === 'preview' && previewUrl && (
         <>
-          <button className="rec-btn" onClick={() => void playUrl(previewUrl)} title="השמע">
+          <button className="rec-btn" onClick={() => void playUrl(previewUrl)} title={t('השמע')}>
             ▶
           </button>
-          <button className="rec-btn save" onClick={() => void save()} title="שמור">
+          <button className="rec-btn save" onClick={() => void save()} title={t('שמור')}>
             ✓
           </button>
           <button
@@ -138,7 +139,7 @@ export function RecordButton({ existingUrl, onSave, onDelete, maxMs = 4000 }: Pr
               setPreviewUrl(null)
               setState('idle')
             }}
-            title="בטל"
+            title={t('בטל')}
           >
             ✗
           </button>

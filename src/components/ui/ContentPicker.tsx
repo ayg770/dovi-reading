@@ -3,6 +3,7 @@ import { NIKUD } from '../../data/hebrew'
 import { useContent } from '../../lib/content'
 import { Selection, loadSelection, saveSelection } from '../../lib/selection'
 import { Learner, getLearner } from '../../lib/supabase'
+import { t } from '../../lib/i18n'
 
 type Props = {
   game: string
@@ -55,7 +56,7 @@ export function ContentPicker({ game, title, icon, onStart, onExit }: Props) {
   return (
     <div className="picker">
       <header className="game-bar">
-        <button className="btn small" onClick={onExit} aria-label="חזרה">
+        <button className="btn small" onClick={onExit} aria-label={t('חזרה')}>
           ✕
         </button>
         <h2 className="picker-title">
@@ -64,13 +65,13 @@ export function ContentPicker({ game, title, icon, onStart, onExit }: Props) {
         <span />
       </header>
 
-      <p className="prompt">מה משחקים?</p>
+      <p className="prompt">{t('מה משחקים?')}</p>
 
       <button
         className={chosen.kind === 'singles' ? 'pick-card on' : 'pick-card'}
         onClick={() => setSel({ kind: 'singles', nikudIds })}
       >
-        <span className="pick-name">הברות בודדות</span>
+        <span className="pick-name">{t('הברות בודדות')}</span>
         <span className="pick-sample">בַּ · בִּ · בָּ</span>
       </button>
       {chosen.kind === 'singles' && (
@@ -82,13 +83,13 @@ export function ContentPicker({ game, title, icon, onStart, onExit }: Props) {
               onClick={() => toggleNikud(n.id)}
             >
               <span className="toggle-sample">{'ב' + n.mark}</span>
-              {n.name}
+              {t(n.name)}
             </button>
           ))}
         </div>
       )}
 
-      {groups.length > 0 && <p className="picker-sub">קבוצות</p>}
+      {groups.length > 0 && <p className="picker-sub">{t('קבוצות')}</p>}
       {groups.map((g) => (
         <button
           key={g.id}
@@ -110,7 +111,7 @@ export function ContentPicker({ game, title, icon, onStart, onExit }: Props) {
       ))}
 
       <button className="btn primary start-btn" onClick={start}>
-        יאללה! ▶
+        {t('יאללה! ▶')}
       </button>
     </div>
   )

@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { t } from '../../lib/i18n'
 
 type Props = {
   /** true from press until the recording ends */
@@ -42,7 +43,7 @@ export function HoldMic({ active, ready, maxMs, onPress, onRelease, disabled }: 
       onPointerUp={release}
       onPointerCancel={release}
       onContextMenu={(e) => e.preventDefault()}
-      aria-label="לחץ והחזק כדי לדבר"
+      aria-label={t('לחץ והחזק כדי לדבר')}
       disabled={disabled}
     >
       <svg className="hold-ring" viewBox="0 0 150 150" aria-hidden>

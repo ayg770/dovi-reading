@@ -1144,3 +1144,55 @@ label {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Language switch */
+.lang-switch {
+  display: inline-flex;
+  align-self: center;
+  background: var(--card);
+  border-radius: 999px;
+  padding: 3px;
+  box-shadow: 0 2px 0 rgba(43, 33, 64, 0.1);
+}
+.lang {
+  background: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-weight: 600;
+}
+.lang.on {
+  background: var(--ink);
+  color: white;
+}
+
+/* Hebrew content keeps reading right to left, whatever the interface language */
+.choice,
+.read-text,
+.syl-text,
+.syl-letter,
+.chip,
+.word-text,
+.preview-word,
+.pick-sample,
+.nikud-row,
+.toggle-sample,
+.nikud-sample,
+.pron-sample {
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+textarea {
+  direction: rtl;
+}
+[dir='ltr'] .pron-sample {
+  direction: ltr;
+}
+[dir='ltr'] .pick-card,
+[dir='ltr'] .panel,
+[dir='ltr'] .gate,
+[dir='ltr'] .account-form {
+  text-align: left;
+}
+[dir='ltr'] .pick-card {
+  align-items: flex-start;
+}

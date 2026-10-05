@@ -4,15 +4,17 @@ import { PraiseTab } from '../components/settings/PraiseTab'
 import { SyllablesTab } from '../components/settings/SyllablesTab'
 import { Pronunciation, currentPronunciation } from '../data/hebrew'
 import { currentAccount, forgetAccount, setStoredCode, setStoredName, switchAccount } from '../lib/account'
+import { LanguageSwitch } from '../components/ui/LanguageSwitch'
 import { changeCode, updateProfile } from '../lib/supabase'
+import { t } from '../lib/i18n'
 
 type Tab = 'groups' | 'syllables' | 'praise' | 'profile'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'groups', label: '📚 קבוצות מילים' },
-  { id: 'syllables', label: '🎙️ הקלטות הברות' },
-  { id: 'praise', label: '🎉 עידוד' },
-  { id: 'profile', label: '👤 פרופיל' },
+  { id: 'groups', label: t('📚 קבוצות מילים') },
+  { id: 'syllables', label: t('🎙️ הקלטות הברות') },
+  { id: 'praise', label: t('🎉 עידוד') },
+  { id: 'profile', label: t('👤 פרופיל') },
 ]
 
 const UNLOCK_KEY = 'dovi-settings-unlocked'
@@ -33,9 +35,9 @@ export function Settings({ onExit }: { onExit: () => void }) {
   return (
     <div className="settings">
       <header className="settings-bar">
-        <h2>הגדרות</h2>
+        <h2>{t('הגדרות')}</h2>
         <button className="btn small" onClick={onExit}>
-          ✕ סגור
+          {t('✕ סגור')}
         </button>
       </header>
       {!unlocked ? (
@@ -79,7 +81,7 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!account || code !== account.code) return setError('קוד שגוי')
+    if (!account || code !== account.code) return setError(t('קוד שגוי'))
     try {
       sessionStorage.setItem(UNLOCK_KEY, account.id)
     } catch {
@@ -90,18 +92,18 @@ function CodeGate({ onUnlock }: { onUnlock: () => void }) {
 
   return (
     <form className="gate" onSubmit={submit}>
-      <p>כדי לשנות הגדרות של {account?.name}, הכניסו את הקוד האישי:</p>
+      <p>{t('כדי לשנות הגדרות של {name}, הכניסו את הקוד האישי:', { name: account?.name ?? '' })}</p>
       <input
         ref={input}
         type="password"
         autoComplete="current-password"
-        placeholder="קוד אישי"
+        placeholder={t('קוד אישי')}
         value={code}
         onChange={(e) => setCode(e.target.value)}
       />
       {error && <p className="error">{error}</p>}
       <button className="btn primary" disabled={!code}>
-        כניסה
+        {t('כניסה')}
       </button>
     </form>
   )
@@ -122,7 +124,7 @@ function ProfileTab({ onLock }: { onLock: () => void }) {
     try {
       await fn()
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'משהו השתבש')
+      setMsg(e instanceof Error ? e.message : t('משהו השתבש'))
     }
     setBusy(false)
   }
@@ -139,8 +141,8 @@ function ProfileTab({ onLock }: { onLock: () => void }) {
 
   const saveCode = (e: React.FormEvent) => {
     e.preventDefault()
-    if (code.length < 4) return setMsg('הקוד צריך להיות לפחות 4 תווים')
-    if (code !== again) return setMsg('הקודים לא זהים')
+    if (code.length < 4) return setMsg(t('הקוד צריך להיות לפחות 4 תווים'))
+    if (code !== again) return setMsg(t('הקודים לא זהים'))
     void run(async () => {
       await changeCode(code)
       setStoredCode(account.id, code)
@@ -150,43 +152,46 @@ function ProfileTab({ onLock }: { onLock: () => void }) {
 
   return (
     <div className="panel">
+      <p className="field-title">{t('שפת הממשק')}</p>
+      <LanguageSwitch onChange={(lang) => updateProfile({ language: lang })} />
+      <hr />
       <form className="gate" onSubmit={saveProfile}>
         <label>
-          שם
+          {t('שם')}
           <input value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        <p className="field-title">הגייה</p>
+        <p className="field-title">{t('הגייה')}</p>
         <div className="pron-options">
           <button
             type="button"
             className={pron === 'ashkenazi' ? 'pick-card on' : 'pick-card'}
             onClick={() => setPron('ashkenazi')}
           >
-            <span className="pick-name">אשכנזית</span>
-            <span className="pron-sample">בָּ = "bo" · בֹּ = "boy" · בֵּ = "bey"</span>
+            <span className="pick-name">{t('אשכנזית')}</span>
+            <span className="pron-sample">{t('בָּ = "bo" · בֹּ = "boy" · בֵּ = "bey"')}</span>
           </button>
           <button
             type="button"
             className={pron === 'sephardi' ? 'pick-card on' : 'pick-card'}
             onClick={() => setPron('sephardi')}
           >
-            <span className="pick-name">רגילה</span>
-            <span className="pron-sample">בָּ = "ba" · בֹּ = "bo" · בֵּ = "be"</span>
+            <span className="pick-name">{t('רגילה')}</span>
+            <span className="pron-sample">{t('בָּ = "ba" · בֹּ = "bo" · בֵּ = "be"')}</span>
           </button>
         </div>
-        <p className="muted">הקלטות נשמרות לפי הגייה: אחרי מעבר, ההקלטות של ההגייה הקודמת לא יושמעו.</p>
+        <p className="muted">{t('הקלטות נשמרות לפי הגייה: אחרי מעבר, ההקלטות של ההגייה הקודמת לא יושמעו.')}</p>
         <button className="btn primary" disabled={busy || (name.trim() === account.name && pron === currentPronunciation())}>
-          שמירה
+          {t('שמירה')}
         </button>
       </form>
 
       <hr />
       <form className="gate" onSubmit={saveCode}>
-        <p>החלפת קוד אישי:</p>
-        <input type="password" autoComplete="new-password" placeholder="קוד חדש" value={code} onChange={(e) => setCode(e.target.value)} />
-        <input type="password" autoComplete="new-password" placeholder="שוב, לאימות" value={again} onChange={(e) => setAgain(e.target.value)} />
+        <p>{t('החלפת קוד אישי:')}</p>
+        <input type="password" autoComplete="new-password" placeholder={t('קוד חדש')} value={code} onChange={(e) => setCode(e.target.value)} />
+        <input type="password" autoComplete="new-password" placeholder={t('שוב, לאימות')} value={again} onChange={(e) => setAgain(e.target.value)} />
         <button className="btn" disabled={busy || !code}>
-          החלפת קוד
+          {t('החלפת קוד')}
         </button>
       </form>
       {msg && <p className="error">{msg}</p>}
@@ -194,19 +199,19 @@ function ProfileTab({ onLock }: { onLock: () => void }) {
       <hr />
       <div className="profile-actions">
         <button className="btn" onClick={onLock}>
-          🔒 נעילת ההגדרות
+          {t('🔒 נעילת ההגדרות')}
         </button>
         <button className="btn" onClick={() => switchAccount(null)}>
-          ⇄ החלפת משתמש
+          {t('⇄ החלפת משתמש')}
         </button>
         <button
           className="btn"
           onClick={() =>
-            confirm(`להסיר את ${account.name} מהמכשיר הזה? הנתונים נשמרים, ואפשר להיכנס שוב עם השם והקוד.`) &&
+            confirm(t('להסיר את {name} מהמכשיר הזה? הנתונים נשמרים, ואפשר להיכנס שוב עם השם והקוד.', { name: account.name })) &&
             forgetAccount(account.id)
           }
         >
-          יציאה מהמכשיר
+          {t('יציאה מהמכשיר')}
         </button>
       </div>
     </div>

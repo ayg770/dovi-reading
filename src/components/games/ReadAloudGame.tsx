@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { playItem, playUrl, praise, sfx, speak, stopAudio } from '../../lib/audio'
+import { playItem, playUrl, praise, sfx, speakUi, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
 import { Item, groupItems, randomSyllableItems } from '../../lib/items'
 import { Selection } from '../../lib/selection'
@@ -12,6 +12,7 @@ import { FinishScreen } from '../ui/FinishScreen'
 import { HoldMic } from '../ui/HoldMic'
 import { StarBar } from '../ui/StarBar'
 import { Stars } from '../ui/Stars'
+import { t } from '../../lib/i18n'
 
 const GAME_TYPE = 'read_aloud'
 const RANDOM_ROUNDS = 10
@@ -36,12 +37,20 @@ const SHARED_MIC_OK = (() => {
   return !mobile && !safari
 })()
 
-const ERROR_TEXT: Record<string, string> = {
-  'not-allowed': 'צריך לאשר גישה למיקרופון בדפדפן',
-  'service-not-allowed': 'צריך לאשר גישה למיקרופון בדפדפן',
-  'language-not-supported': 'זיהוי קול בעברית לא זמין במכשיר הזה',
-  network: 'אין חיבור לשירות זיהוי הקול',
-  'audio-capture': 'המיקרופון לא זמין',
+function errorText(code: string): string {
+  switch (code) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return t('צריך לאשר גישה למיקרופון בדפדפן')
+    case 'language-not-supported':
+      return t('זיהוי קול בעברית לא זמין במכשיר הזה')
+    case 'network':
+      return t('אין חיבור לשירות זיהוי הקול')
+    case 'audio-capture':
+      return t('המיקרופון לא זמין')
+    default:
+      return t('הזיהוי לא שמע')
+  }
 }
 
 type Phase = 'look' | 'listening' | 'judge' | 'right' | 'wrong'
@@ -113,7 +122,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
     } catch {
       // no storage: say it every game
     }
-    void speak('לוחצים על המיקרופון ומחזיקים, וקוראים בקול', 0.9)
+    void speakUi(t('לוחצים על המיקרופון ומחזיקים, וקוראים בקול'))
   }, [items])
 
   // Free the previous attempt's audio.
@@ -222,7 +231,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       h.listening?.abort()
       void h.rec?.then((r) => r?.stop())
       hold.current = null
-      setNotice('צריך להחזיק את 🎤 לחוץ כל זמן שקוראים')
+      setNotice(t('צריך להחזיק את 🎤 לחוץ כל זמן שקוראים'))
       setPhase('look')
       return
     }
@@ -257,11 +266,11 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       if (soft && empties + 1 < MAX_EMPTY) {
         // Heard nothing: let him try again without counting it.
         setEmpties((n) => n + 1)
-        setNotice(`לא שמעתי, ננסה שוב? (${code})`)
+        setNotice(`${t('לא שמעתי, ננסה שוב?')} (${code})`)
         setPhase('look')
       } else {
         // The recognizer keeps failing (no permission, no network, silence…): a grown-up decides.
-        setNotice(`${ERROR_TEXT[code] ?? 'הזיהוי לא שמע'} (${code})`)
+        setNotice(`${errorText(code)} (${code})`)
         setPhase('judge')
       }
       return
@@ -289,7 +298,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
     <div className="game">
       <Confetti fire={confetti} />
       <header className="game-bar">
-        <button className="btn small" onClick={onExit} aria-label="חזרה">
+        <button className="btn small" onClick={onExit} aria-label={t('חזרה')}>
           ✕
         </button>
         <Stars total={total} filled={index} />
@@ -303,7 +312,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
 
       {(phase === 'look' || phase === 'listening') && (
         <>
-          <p className="prompt icon-prompt" aria-label={phase === 'look' ? 'קרא בקול' : 'מקשיב'}>
+          <p className="prompt icon-prompt" aria-label={phase === 'look' ? t('קרא בקול') : t('מקשיב')}>
             {phase === 'look' ? '👀 ⬅ 🗣️' : micReady ? <span className="listening-ear">👂</span> : '⏳'}
           </p>
           <div className="read-actions">
@@ -315,7 +324,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
               onRelease={endHold}
             />
             {phase === 'look' && (
-              <button className="round-btn listen-small" onClick={() => void playItem(item)} aria-label="שמע">
+              <button className="round-btn listen-small" onClick={() => void playItem(item)} aria-label={t('שמע')}>
                 🔊
               </button>
             )}
@@ -330,21 +339,21 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
           {heard && <p className="heard">{heard}</p>}
           {myVoice && (
             <button className="btn" onClick={() => void playUrl(myVoice)}>
-              ▶ שמע את עצמך
+              {t('▶ שמע את עצמך')}
             </button>
           )}
-          <p className="hint-text">הורה: האם הוא קרא נכון?</p>
+          <p className="hint-text">{t('הורה: האם הוא קרא נכון?')}</p>
           <div className="finish-actions">
             <button className="btn good" onClick={() => finishItem(true, 'parent')}>
-              ✓ נכון
+              {t('✓ נכון')}
             </button>
             <button className="btn bad" onClick={() => finishItem(false, 'parent')}>
-              ✗ עוד לא
+              {t('✗ עוד לא')}
             </button>
           </div>
           {canRecognize && (
             <button className="parent-link" onClick={() => setPhase('look')}>
-              🎤 לנסות שוב את זיהוי הקול
+              {t('🎤 לנסות שוב את זיהוי הקול')}
             </button>
           )}
         </div>
@@ -352,37 +361,37 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
 
       {(phase === 'right' || phase === 'wrong') && (
         <div className="judge">
-          <p className="result-face" aria-label={phase === 'right' ? 'יופי' : 'כמעט'}>
+          <p className="result-face" aria-label={phase === 'right' ? t('יופי') : t('כמעט')}>
             {phase === 'right' ? '🤩' : '🤔'}
           </p>
-          {heard && <p className="heard">שמעתי: {heard}</p>}
+          {heard && <p className="heard">{t('שמעתי: {text}', { text: heard })}</p>}
           <div className="finish-actions">
             {myVoice && (
-              <button className="btn icon-btn" onClick={() => void playUrl(myVoice)} aria-label="שמע את עצמך">
+              <button className="btn icon-btn" onClick={() => void playUrl(myVoice)} aria-label={t('שמע את עצמך')}>
                 ▶ 🧒
               </button>
             )}
-            <button className="btn icon-btn" onClick={() => void playItem(item)} aria-label="איך אומרים">
+            <button className="btn icon-btn" onClick={() => void playItem(item)} aria-label={t('איך אומרים')}>
               🔊
             </button>
           </div>
           <div className="finish-actions">
             {phase === 'wrong' && tries < MAX_TRIES && (
-              <button className="btn primary icon-btn" onClick={() => setPhase('look')} aria-label="שוב">
+              <button className="btn primary icon-btn" onClick={() => setPhase('look')} aria-label={t('שוב')}>
                 🔁 🎤
               </button>
             )}
             <button
               className={phase === 'right' || tries >= MAX_TRIES ? 'btn primary icon-btn' : 'btn icon-btn'}
               onClick={goNext}
-              aria-label="הבא"
+              aria-label={t('הבא')}
             >
               ⬅
             </button>
           </div>
           {phase === 'wrong' && canRecognize && (
             <button className="parent-link" onClick={() => finishItem(true, 'parent-override')}>
-              הורה: הוא אמר נכון ✓
+              {t('הורה: הוא אמר נכון ✓')}
             </button>
           )}
         </div>

@@ -17,6 +17,7 @@ import { Confetti } from '../ui/Confetti'
 import { FinishScreen } from '../ui/FinishScreen'
 import { StarBar } from '../ui/StarBar'
 import { Stars } from '../ui/Stars'
+import { t } from '../../lib/i18n'
 
 const SINGLES_ROUNDS = 10
 const GAME_TYPE = 'hear_syllable'
@@ -174,7 +175,7 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
     <div className="game">
       <Confetti fire={confetti} />
       <header className="game-bar">
-        <button className="btn small" onClick={onExit} aria-label="חזרה">
+        <button className="btn small" onClick={onExit} aria-label={t('חזרה')}>
           ✕
         </button>
         <Stars total={total} filled={round} />
@@ -182,10 +183,10 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
       <StarBar />
       {groupName && <p className="group-tag">{groupName}</p>}
 
-      <button className="listen" onClick={() => void playItem(question.answer)} aria-label="שמע שוב">
+      <button className="listen" onClick={() => void playItem(question.answer)} aria-label={t('שמע שוב')}>
         🔊
       </button>
-      <p className="prompt icon-prompt" aria-label="מה שמעת?">
+      <p className="prompt icon-prompt" aria-label={t('מה שמעת?')}>
         👂 ⬅ 👆
       </p>
 

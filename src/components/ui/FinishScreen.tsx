@@ -4,6 +4,7 @@ import { refreshContent } from '../../lib/content'
 import { advanceGroup } from '../../lib/supabase'
 import { Confetti } from './Confetti'
 import { StarBar } from './StarBar'
+import { t } from '../../lib/i18n'
 
 type Props = {
   score: number
@@ -43,7 +44,7 @@ export function FinishScreen({ score, total, groupId, groupName, onRestart, onEx
       <Confetti fire={1} big />
       <div className="big-stars">{'⭐'.repeat(stars)}</div>
       <div className="trophy">🏆</div>
-      <div className="earned-row" aria-label={`${score} מתוך ${total}`}>
+      <div className="earned-row" aria-label={t('{score} מתוך {total}', { score, total })}>
         {Array.from({ length: total }, (_, i) => (
           <span key={i} className={i < score ? 'earned on' : 'earned'}>
             {i < score ? '⭐' : '•'}
@@ -57,15 +58,15 @@ export function FinishScreen({ score, total, groupId, groupName, onRestart, onEx
             className="btn next-group icon-btn"
             disabled={state === 'busy'}
             onClick={() => void advance()}
-            aria-label="לקבוצה הבאה"
+            aria-label={t('לקבוצה הבאה')}
           >
             ⏭️
           </button>
         )}
-        <button className="btn primary icon-btn" onClick={onRestart} aria-label="עוד פעם">
+        <button className="btn primary icon-btn" onClick={onRestart} aria-label={t('עוד פעם')}>
           🔁
         </button>
-        <button className="btn icon-btn" onClick={onExit} aria-label="חזרה">
+        <button className="btn icon-btn" onClick={onExit} aria-label={t('חזרה')}>
           🏠
         </button>
       </div>

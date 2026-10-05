@@ -9,6 +9,7 @@ import {
   wordSpeechText,
 } from '../data/hebrew'
 import { praiseUrls, recordedSyllableUrl, storageUrl } from './content'
+import { speechLang, praiseWords } from './i18n'
 import { Item, asSyllable } from './items'
 
 const BASE = import.meta.env.BASE_URL
@@ -38,17 +39,24 @@ export function playUrl(url: string): Promise<boolean> {
   })
 }
 
-function hebrewVoice(): SpeechSynthesisVoice | undefined {
-  return window.speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith('he'))
+function voiceFor(lang: string): SpeechSynthesisVoice | undefined {
+  const prefix = lang.slice(0, 2).toLowerCase()
+  return window.speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith(prefix))
 }
 
-export function speak(text: string, rate = 0.7): Promise<void> {
+/** Say an instruction or cheer in the interface language. */
+export function speakUi(text: string, rate = 0.9): Promise<void> {
+  return speak(text, rate, speechLang())
+}
+
+/** Say text with the speech engine; `lang` is he-IL for the Hebrew learning content. */
+export function speak(text: string, rate = 0.7, lang = 'he-IL'): Promise<void> {
   return new Promise((resolve) => {
     if (!('speechSynthesis' in window)) return resolve()
     const u = new SpeechSynthesisUtterance(text)
-    u.lang = 'he-IL'
+    u.lang = lang
     u.rate = rate
-    const voice = hebrewVoice()
+    const voice = voiceFor(lang)
     if (voice) u.voice = voice
     u.onend = () => resolve()
     u.onerror = () => resolve()
@@ -186,14 +194,14 @@ export const sfx = {
   },
 }
 
-const PRAISE_WORDS = ['כל הכבוד!', 'יופי!', 'מצוין!', 'נהדר!', 'איזה יופי!']
 
 /** Praise out loud: a clip recorded in the settings, or the speech engine. */
 export async function praise(chance = 1) {
   if (Math.random() > chance) return
   const clips = praiseUrls()
   if (clips.length && (await playUrl(clips[Math.floor(Math.random() * clips.length)]))) return
-  await speak(PRAISE_WORDS[Math.floor(Math.random() * PRAISE_WORDS.length)], 1)
+  const words = praiseWords()
+  await speakUi(words[Math.floor(Math.random() * words.length)], 1)
 }
 
 // Voices load asynchronously in Chrome.

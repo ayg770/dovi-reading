@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { speak } from './audio'
+import { speakUi } from './audio'
+import { t } from './i18n'
 import { addStars, getLearner } from './supabase'
 
 // Stars across all games, and the animals they earn: one every STARS_PER_ANIMAL.
@@ -74,7 +75,7 @@ export function earnStar() {
   const after = before + 1
   const earned = animalsEarned(after) > animalsEarned(before) ? ANIMALS[animalsEarned(after) - 1] : null
   set({ stars: after, newAnimal: earned ?? state.newAnimal })
-  if (earned) setTimeout(() => void speak(earned.name + '!', 0.9), 1800)
+  if (earned) setTimeout(() => void speakUi(t(earned.name) + '!'), 1800)
   void addStars(1).then((total) => {
     // The server's count wins if another device added stars meanwhile.
     if (total !== null && total > state.stars) set({ stars: total })

@@ -9,6 +9,7 @@ import {
   useStars,
 } from '../../lib/stars'
 import { Confetti } from './Confetti'
+import { t } from '../../lib/i18n'
 
 /**
  * The fixed row of stars: total, ten slots filling toward the next animal
@@ -37,7 +38,7 @@ export function StarBar() {
 
   return (
     <>
-      <div className={pop ? 'star-bar pop' : 'star-bar'} aria-label={`${stars} כוכבים`}>
+      <div className={pop ? 'star-bar pop' : 'star-bar'} aria-label={t('{n} כוכבים', { n: stars })}>
         <span className="star-total">
           ⭐<b>{stars}</b>
         </span>
@@ -49,7 +50,7 @@ export function StarBar() {
           ))}
         </span>
         {next ? (
-          <span className="star-next" title="החיה הבאה">
+          <span className="star-next" title={t('החיה הבאה')}>
             {next.emoji}
           </span>
         ) : (
@@ -84,9 +85,9 @@ export function AnimalCollection() {
   const { stars } = useStars()
   const earned = animalsEarned(stars)
   return (
-    <div className="collection" aria-label="האוסף שלי">
+    <div className="collection" aria-label={t('האוסף שלי')}>
       {ANIMALS.map((a, i) => (
-        <span key={a.emoji} className={i < earned ? 'col-animal on' : 'col-animal'} title={i < earned ? a.name : ''}>
+        <span key={a.emoji} className={i < earned ? 'col-animal on' : 'col-animal'} title={i < earned ? t(a.name) : ''}>
           {a.emoji}
         </span>
       ))}

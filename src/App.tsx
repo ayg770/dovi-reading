@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { HearSyllableGame } from './components/games/HearSyllableGame'
 import { ReadAloudGame } from './components/games/ReadAloudGame'
 import { ContentPicker } from './components/ui/ContentPicker'
+import { getLang, setLang, t } from './lib/i18n'
 import { setPronunciation } from './data/hebrew'
 import { currentAccount, switchAccount } from './lib/account'
 import { ensureContent, refreshContent } from './lib/content'
@@ -12,8 +13,8 @@ import { Welcome } from './pages/Welcome'
 import { getLearner } from './lib/supabase'
 
 const TITLES: Record<GameId, { title: string; icon: string }> = {
-  hear_syllable: { title: 'שמע ובחר', icon: '👂' },
-  read_aloud: { title: 'קרא בקול', icon: '🗣️' },
+  hear_syllable: { title: t('שמע ובחר'), icon: '👂' },
+  read_aloud: { title: t('קרא בקול'), icon: '🗣️' },
 }
 
 type Screen =
@@ -33,6 +34,12 @@ export default function App() {
     if (!account) return
     void getLearner().then((learner) => {
       if (!learner) return setBoot('invalid')
+      // The user's language follows them to a new device (the page builds its texts once, so reload).
+      if (learner.language && learner.language !== getLang()) {
+        setLang(learner.language)
+        location.reload()
+        return
+      }
       setPronunciation(learner.pronunciation)
       void ensureContent()
       setBoot('ready')
@@ -41,7 +48,7 @@ export default function App() {
 
   if (!account) return <Welcome />
   if (boot === 'loading') return <div className="game loading">…</div>
-  if (boot === 'invalid') return <Welcome error={`לא הצלחנו להיכנס בתור ${account.name}. אולי הקוד הוחלף או שאין חיבור — נסו להיכנס שוב.`} />
+  if (boot === 'invalid') return <Welcome error={t('לא הצלחנו להיכנס בתור {name}. אולי הקוד הוחלף או שאין חיבור — נסו להיכנס שוב.', { name: account.name })} />
 
   const home = () => setScreen({ kind: 'home' })
 

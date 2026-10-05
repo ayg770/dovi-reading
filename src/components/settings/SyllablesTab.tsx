@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import { NIKUD, SYLLABLE_LETTERS, currentPronunciation, syllableText } from '../../data/hebrew'
 import { deleteSyllableRecording, saveSyllableRecording } from '../../lib/admin'
 import { ownRecording, storageUrl, useContent } from '../../lib/content'
+import { t } from '../../lib/i18n'
 import { RecordButton } from '../ui/RecordButton'
 
 /** A grid of every letter × nikud; tap to record Dovi (or anyone) saying it. */
@@ -15,14 +16,16 @@ export function SyllablesTab() {
   return (
     <div className="panel">
       <p className="muted">
-        הקלטה של הברה מחליפה את הקול הממוחשב בכל המשחקים. מילה שכל ההברות שלה מוקלטות תושמע
-        כחיבור של ההקלטות. הוקלטו {count} מתוך {SYLLABLE_LETTERS.length * NIKUD.length}.
+        {t('הקלטה של הברה מחליפה את הקול הממוחשב בכל המשחקים. מילה שכל ההברות שלה מוקלטות תושמע כחיבור של ההקלטות. הוקלטו {count} מתוך {total}.', {
+          count,
+          total: SYLLABLE_LETTERS.length * NIKUD.length,
+        })}
       </p>
       <div className="syl-grid">
         <div className="syl-head" />
         {NIKUD.map((n) => (
           <div key={n.id} className="syl-head">
-            {n.name}
+            {t(n.name)}
           </div>
         ))}
         {SYLLABLE_LETTERS.map((letter) => (

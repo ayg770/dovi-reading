@@ -1,6 +1,7 @@
 import { SupabaseClient, createClient } from '@supabase/supabase-js'
 import type { Pronunciation, WordSyllable } from '../data/hebrew'
 import { Account, currentAccount } from './account'
+import { Lang, t } from './i18n'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
@@ -31,23 +32,31 @@ export const supabase: SupabaseClient | null = makeClient(currentAccount())
 // ---------------------------------------------------------------------------
 // Accounts
 
-const ERRORS: Record<string, string> = {
-  'name taken': 'השם הזה כבר תפוס, נסו שם אחר',
-  'name must be 1-40 characters': 'צריך שם (עד 40 תווים)',
-  'code must be at least 4 characters': 'הקוד צריך להיות לפחות 4 תווים',
+function errorKey(m: string): string | null {
+  if (m === 'name taken') return 'השם הזה כבר תפוס, נסו שם אחר'
+  if (m === 'name must be 1-40 characters') return 'צריך שם (עד 40 תווים)'
+  if (m === 'code must be at least 4 characters') return 'הקוד צריך להיות לפחות 4 תווים'
+  return null
 }
 
 function message(error: { message: string }): string {
-  return ERRORS[error.message] ?? error.message
+  const key = errorKey(error.message)
+  return key ? t(key) : error.message
 }
 
 /** Create a user; returns their id, or throws a message to show. */
-export async function createUser(name: string, code: string, pronunciation: Pronunciation): Promise<string> {
-  if (!supabase) throw new Error('אין חיבור לשרת')
+export async function createUser(
+  name: string,
+  code: string,
+  pronunciation: Pronunciation,
+  language: Lang,
+): Promise<string> {
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
   const { data, error } = await supabase.rpc('create_user', {
     p_name: name,
     p_code: code,
     p_pronunciation: pronunciation,
+    p_language: language,
   })
   if (error) throw new Error(message(error))
   return data as string
@@ -55,14 +64,14 @@ export async function createUser(name: string, code: string, pronunciation: Pron
 
 /** The user's id if the name and code match, else null. */
 export async function loginUser(name: string, code: string): Promise<string | null> {
-  if (!supabase) throw new Error('אין חיבור לשרת')
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
   const { data, error } = await supabase.rpc('login_user', { p_name: name, p_code: code })
   if (error) throw new Error(message(error))
   return (data as string | null) ?? null
 }
 
 export async function changeCode(newCode: string): Promise<void> {
-  if (!supabase) throw new Error('אין חיבור לשרת')
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
   const { error } = await supabase.rpc('change_code', { p_new_code: newCode })
   if (error) throw new Error(message(error))
 }
@@ -74,6 +83,7 @@ export type Learner = {
   id: string
   name: string
   pronunciation: Pronunciation
+  language: Lang
   current_group_id: string | null
   stars: number
 }
@@ -86,7 +96,7 @@ export function getLearner(): Promise<Learner | null> {
     if (!supabase || !account) return null
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, pronunciation, current_group_id, stars')
+      .select('id, name, pronunciation, language, current_group_id, stars')
       .eq('id', account.id)
       .maybeSingle()
     if (error) console.warn('supabase: could not load user', error)
@@ -103,12 +113,12 @@ function forgetLearner() {
   learnerPromise = null
 }
 
-export async function updateProfile(fields: { name?: string; pronunciation?: Pronunciation }) {
+export async function updateProfile(fields: { name?: string; pronunciation?: Pronunciation; language?: Lang }) {
   const userId = await getLearnerId()
-  if (!supabase || !userId) throw new Error('אין חיבור לשרת')
+  if (!supabase || !userId) throw new Error(t('אין חיבור לשרת'))
   const { error } = await supabase.from('users').update(fields).eq('id', userId)
   forgetLearner()
-  if (error) throw new Error(error.message.includes('users_name_key') ? ERRORS['name taken'] : error.message)
+  if (error) throw new Error(error.message.includes('users_name_key') ? t('השם הזה כבר תפוס, נסו שם אחר') : error.message)
 }
 
 export type ProgressRow = { letter_id: number; nikud_id: number; attempts: number; correct: number }
@@ -203,7 +213,7 @@ export async function advanceGroup(fromGroupId: string): Promise<string | null> 
 
 export async function setCurrentGroup(groupId: string | null): Promise<string | null> {
   const userId = await getLearnerId()
-  if (!supabase || !userId) return 'אין חיבור לשרת'
+  if (!supabase || !userId) return t('אין חיבור לשרת')
   const { error } = await supabase
     .from('users')
     .update({ current_group_id: groupId })
@@ -292,10 +302,10 @@ function extensionFor(type: string): string {
 
 /** Upload a recording; returns the storage path. */
 export async function uploadAudio(folder: string, name: string, blob: Blob): Promise<string> {
-  if (!supabase) throw new Error('אין חיבור לשרת')
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
   const type = blob.type.split(';')[0] || 'audio/webm'
   const userId = await getLearnerId()
-  if (!userId) throw new Error('אין משתמש מחובר')
+  if (!userId) throw new Error(t('אין משתמש מחובר'))
   // Each user's files live under their own id; the storage policy checks it.
   const path = `${userId}/${folder}/${name}-${Date.now()}.${extensionFor(type)}`
   const { error } = await supabase.storage
