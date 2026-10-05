@@ -200,3 +200,34 @@ export function heardMatches(heard: string[], syllables: WordSyllable[]): boolea
   }
   return false
 }
+
+/**
+ * Did he read this whole text (a sentence or line)? Each word of the text should be heard,
+ * in any spelling that fits its sounds or the plain dictionary spelling; the order is not
+ * checked, because the recognizer often drops or merges small words. At least 60% of the
+ * words (all of them, up to two) must be found.
+ */
+export function heardMatchesText(heard: string[], text: string, parse: (word: string) => WordSyllable[]): boolean {
+  const words = text.split(/\s+/).filter(Boolean)
+  if (!words.length) return false
+  const need = words.length <= 2 ? words.length : Math.ceil(words.length * 0.6)
+  const variants = words.map((w) => {
+    const syl = parse(w)
+    const plain = normalize(syl.map((s) => s.text).join(''))
+    return new Set([...expectedSpellings(syl), plain].filter(Boolean))
+  })
+  let best = 0
+  for (const alt of heard) {
+    const pool = alt.split(/\s+/).map(normalize).filter(Boolean)
+    let found = 0
+    for (const v of variants) {
+      const i = pool.findIndex((h) => v.has(h) || [...v].some((t) => t.length >= 4 && oneConsonantSlip(h, t)))
+      if (i >= 0) {
+        found++
+        pool.splice(i, 1)
+      }
+    }
+    best = Math.max(best, found)
+  }
+  return best >= need
+}

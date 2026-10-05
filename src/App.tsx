@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { HearSyllableGame } from './components/games/HearSyllableGame'
 import { ReadAloudGame } from './components/games/ReadAloudGame'
+import { TextAutoGame } from './components/games/TextAutoGame'
 import { ContentPicker } from './components/ui/ContentPicker'
+import { TextPicker } from './components/ui/TextPicker'
 import { getLang, setLang, t } from './lib/i18n'
 import { setPronunciation } from './data/hebrew'
 import { currentAccount, switchAccount } from './lib/account'
@@ -12,7 +14,7 @@ import { Settings } from './pages/Settings'
 import { Welcome } from './pages/Welcome'
 import { getLearner } from './lib/supabase'
 
-const TITLES: Record<GameId, { title: string; icon: string }> = {
+const TITLES: Record<Exclude<GameId, 'read_text'>, { title: string; icon: string }> = {
   hear_syllable: { title: t('שמע ובחר'), icon: '👂' },
   read_aloud: { title: t('קרא בקול'), icon: '🗣️' },
 }
@@ -20,8 +22,10 @@ const TITLES: Record<GameId, { title: string; icon: string }> = {
 type Screen =
   | { kind: 'home' }
   | { kind: 'settings' }
-  | { kind: 'pick'; game: GameId }
-  | { kind: 'play'; game: GameId; selection: Selection }
+  | { kind: 'pick'; game: Exclude<GameId, 'read_text'> }
+  | { kind: 'play'; game: Exclude<GameId, 'read_text'>; selection: Selection }
+  | { kind: 'text-pick' }
+  | { kind: 'text-auto'; groupId: string; pace: number }
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ kind: 'home' })
@@ -62,6 +66,23 @@ export default function App() {
       />
     )
 
+  if (screen.kind === 'text-pick')
+    return (
+      <TextPicker
+        onExit={home}
+        onStart={(c) =>
+          c.mode === 'auto'
+            ? setScreen({ kind: 'text-auto', groupId: c.groupId, pace: c.pace })
+            : setScreen({ kind: 'play', game: 'read_aloud', selection: { kind: 'group', groupId: c.groupId, rounds: 0 } })
+        }
+      />
+    )
+
+  if (screen.kind === 'text-auto')
+    return (
+      <TextAutoGame key={run} groupId={screen.groupId} pace={screen.pace} onExit={home} onRestart={() => setRun((r) => r + 1)} />
+    )
+
   if (screen.kind === 'pick')
     return (
       <ContentPicker
@@ -91,7 +112,7 @@ export default function App() {
   return (
     <Home
       userName={account.name}
-      onPlay={(game) => setScreen({ kind: 'pick', game })}
+      onPlay={(game) => setScreen(game === 'read_text' ? { kind: 'text-pick' } : { kind: 'pick', game })}
       onSettings={() => setScreen({ kind: 'settings' })}
       onSwitchUser={() => switchAccount(null)}
     />

@@ -3,16 +3,18 @@ import { GroupsTab } from '../components/settings/GroupsTab'
 import { PraiseTab } from '../components/settings/PraiseTab'
 import { ProgressTab } from '../components/settings/ProgressTab'
 import { SyllablesTab } from '../components/settings/SyllablesTab'
+import { TextsTab } from '../components/settings/TextsTab'
 import { Pronunciation, currentPronunciation } from '../data/hebrew'
 import { currentAccount, forgetAccount, setStoredCode, setStoredName, switchAccount } from '../lib/account'
 import { LanguageSwitch } from '../components/ui/LanguageSwitch'
 import { changeCode, updateProfile } from '../lib/supabase'
 import { t } from '../lib/i18n'
 
-type Tab = 'groups' | 'syllables' | 'progress' | 'praise' | 'profile'
+type Tab = 'groups' | 'texts' | 'syllables' | 'progress' | 'praise' | 'profile'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'groups', label: t('📚 קבוצות מילים') },
+  { id: 'texts', label: t('📖 טקסטים') },
   { id: 'syllables', label: t('🎙️ הקלטות הברות') },
   { id: 'progress', label: t('📊 התקדמות') },
   { id: 'praise', label: t('🎉 עידוד') },
@@ -54,6 +56,7 @@ export function Settings({ onExit }: { onExit: () => void }) {
             ))}
           </nav>
           {tab === 'groups' && <GroupsTab />}
+          {tab === 'texts' && <TextsTab />}
           {tab === 'syllables' && <SyllablesTab />}
           {tab === 'progress' && <ProgressTab />}
           {tab === 'praise' && <PraiseTab />}

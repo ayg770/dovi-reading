@@ -113,12 +113,12 @@ export async function splitGroup(group: Group, size: number) {
   await refreshContent()
 }
 
-export async function createGroup(name: string, lines: string[]) {
+export async function createGroup(name: string, lines: string[], kind: 'words' | 'text' = 'words') {
   const owner = await me()
   const groups = getContent().groups
   const sortOrder = groups.length ? Math.max(...groups.map((g) => g.sort_order)) + 1 : 1
   const { data } = check(
-    await db().from('word_groups').insert({ name, sort_order: sortOrder, user_id: owner }).select('id').single(),
+    await db().from('word_groups').insert({ name, sort_order: sortOrder, user_id: owner, kind }).select('id').single(),
   )
   const unique = [...new Set(lines)]
   if (unique.length)

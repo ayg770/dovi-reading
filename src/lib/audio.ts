@@ -19,7 +19,10 @@ function staticUrl(path: string): string {
 
 let current: HTMLAudioElement | null = null
 
+let gradualToken = 0
+
 export function stopAudio() {
+  gradualToken++
   if (current) {
     current.pause()
     current = null
@@ -204,4 +207,27 @@ export async function playItem(item: Item) {
   const s = asSyllable(item)
   if (s) return playSyllable(s)
   return playWord(item)
+}
+
+/** One syllable of a word: its recording if there is one, else the speech engine. */
+async function playWordSyllable(ws: WordSyllable) {
+  const url = syllableRecording(ws)
+  if (url && (await playUrl(url))) return
+  await speak(wordSpeechText(ws.text), 0.6)
+}
+
+/**
+ * Read a word slowly, syllable by syllable: `onStep` is told which syllable is being
+ * said (and null at the end), so the screen can light it up. Any stopAudio() cancels.
+ */
+export async function playGradual(syllables: WordSyllable[], onStep: (i: number | null) => void) {
+  stopAudio()
+  const mine = gradualToken
+  for (let i = 0; i < syllables.length; i++) {
+    if (mine !== gradualToken) return
+    onStep(i)
+    await playWordSyllable(syllables[i])
+    await new Promise((r) => setTimeout(r, 160))
+  }
+  if (mine === gradualToken) onStep(null)
 }

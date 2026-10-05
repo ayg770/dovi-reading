@@ -4,7 +4,7 @@ import { Content, Group, Recording, loadContent, signAudio } from './supabase'
 
 // One shared copy of the content (groups, recordings, praise clips) for the whole app.
 
-let content: Content = { groups: [], recordings: [], praise: [] }
+let content: Content = { groups: [], texts: [], recordings: [], praise: [] }
 /** Recordings are private; these are temporary links to them, by storage path. */
 let links: Record<string, string> = {}
 let loading: Promise<Content> | null = null

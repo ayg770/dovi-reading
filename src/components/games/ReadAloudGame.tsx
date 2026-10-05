@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { playItem, playUrl, praise, sfx, speakUi, stopAudio } from '../../lib/audio'
+import { parseText } from '../../data/hebrew'
+import { playGradual, playItem, playUrl, praise, sfx, speakUi, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
 import { Item, groupItems, randomSyllableItems } from '../../lib/items'
 import { Selection, roundsOf, windowItems } from '../../lib/selection'
 import { earnStar } from '../../lib/stars'
 import { Recording, canRecord, startRecording } from '../../lib/recorder'
-import { Listening, canRecognize, heardMatches, listen } from '../../lib/speech'
+import { Listening, canRecognize, heardMatches, heardMatchesText, listen } from '../../lib/speech'
 import { finishSession, recordAnswer, saveSessionDetails, startSession } from '../../lib/supabase'
 import { Confetti } from '../ui/Confetti'
 import { FinishScreen } from '../ui/FinishScreen'
 import { HoldMic } from '../ui/HoldMic'
+import { SyllableText } from '../ui/SyllableText'
 import { StarBar } from '../ui/StarBar'
 import { Stars } from '../ui/Stars'
 import { t } from '../../lib/i18n'
@@ -72,6 +74,8 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
   const [empties, setEmpties] = useState(0)
   const [myVoice, setMyVoice] = useState<string | null>(null)
   const [micReady, setMicReady] = useState(false)
+  const [lit, setLit] = useState<number | null>(null)
+  const [isText, setIsText] = useState(false)
   const [score, setScore] = useState(0)
   const [done, setDone] = useState(false)
   const [confetti, setConfetti] = useState(0)
@@ -97,8 +101,11 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
     sessionId.current ??= startSession(GAME_TYPE)
     void ensureContent().then((content) => {
       const group =
-        selection.kind === 'group' ? content.groups.find((g) => g.id === selection.groupId) : null
+        selection.kind === 'group'
+          ? (content.groups.find((g) => g.id === selection.groupId) ?? content.texts.find((g) => g.id === selection.groupId))
+          : null
       if (group && group.words.length) {
+        setIsText(group.kind === 'text')
         setItems(windowItems(groupItems(group), group.id, roundsOf(selection)))
         setGroupName(group.name)
       } else {
@@ -171,6 +178,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
 
   const goNext = () => {
     stopAudio()
+    setLit(null)
     setNotice(null)
     setMyVoice(null)
     setHeard('')
@@ -277,7 +285,10 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
     setEmpties(0)
     const text = result.alternatives[result.alternatives.length - 1]
     setHeard(text)
-    finishItem(heardMatches(result.alternatives, item.syllables), 'speech', text, result.alternatives)
+    const ok = /\s/.test(item.text.trim())
+      ? heardMatchesText(result.alternatives, item.text, parseText)
+      : heardMatches(result.alternatives, item.syllables)
+    finishItem(ok, 'speech', text, result.alternatives)
   }
 
   if (done)
@@ -285,7 +296,7 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       <FinishScreen
         score={score}
         total={total}
-        groupId={selection.kind === 'group' && groupName ? selection.groupId : null}
+        groupId={selection.kind === 'group' && groupName && !isText ? selection.groupId : null}
         groupName={groupName}
         onRestart={onRestart}
         onExit={onExit}
@@ -306,7 +317,13 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       {groupName && <p className="group-tag">{groupName}</p>}
 
       <div className={`read-card ${phase === 'right' ? 'right' : phase === 'wrong' ? 'wrong' : ''}`}>
-        <span className="read-text">{item.text}</span>
+        <span className={/\s/.test(item.text.trim()) ? 'read-text sentence' : 'read-text'}>
+          {lit !== null && item.syllables.length > 1 && !/\s/.test(item.text.trim()) ? (
+            <SyllableText syllables={item.syllables} active={lit} />
+          ) : (
+            item.text
+          )}
+        </span>
       </div>
 
       {(phase === 'look' || phase === 'listening') && (
@@ -325,6 +342,15 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
             {phase === 'look' && (
               <button className="round-btn listen-small" onClick={() => void playItem(item)} aria-label={t('שמע')}>
                 🔊
+              </button>
+            )}
+            {phase === 'look' && item.syllables.length > 1 && !/\s/.test(item.text.trim()) && (
+              <button
+                className="round-btn listen-small slow"
+                onClick={() => void playGradual(item.syllables, setLit)}
+                aria-label={t('הקראה הדרגתית')}
+              >
+                🐢
               </button>
             )}
           </div>

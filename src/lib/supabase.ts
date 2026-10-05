@@ -264,7 +264,7 @@ export type Word = {
   sort_order: number
 }
 
-export type Group = { id: string; name: string; sort_order: number; words: Word[] }
+export type Group = { id: string; name: string; sort_order: number; kind: 'words' | 'text'; words: Word[] }
 
 export type Recording = {
   id: string
@@ -278,16 +278,19 @@ export type Recording = {
 export type PraiseClip = { id: string; audio_path: string }
 
 export type Content = {
+  /** lists of syllables and words to practice */
   groups: Group[]
+  /** texts: each row of a group is a sentence or line */
+  texts: Group[]
   recordings: Recording[]
   praise: PraiseClip[]
 }
 
 export async function loadContent(): Promise<Content> {
-  const empty: Content = { groups: [], recordings: [], praise: [] }
+  const empty: Content = { groups: [], texts: [], recordings: [], praise: [] }
   if (!supabase) return empty
   const [groups, words, recordings, praise] = await Promise.all([
-    supabase.from('word_groups').select('id, name, sort_order').order('sort_order'),
+    supabase.from('word_groups').select('id, name, sort_order, kind').order('sort_order'),
     supabase
       .from('words')
       .select('id, group_id, text, plain_text, syllables, audio_path, sort_order')
@@ -297,11 +300,14 @@ export async function loadContent(): Promise<Content> {
   ])
   for (const r of [groups, words, recordings, praise])
     if (r.error) console.warn('supabase: could not load content', r.error)
+  const all = (groups.data ?? []).map((g) => ({
+    ...g,
+    kind: g.kind as 'words' | 'text',
+    words: (words.data ?? []).filter((w) => w.group_id === g.id),
+  }))
   return {
-    groups: (groups.data ?? []).map((g) => ({
-      ...g,
-      words: (words.data ?? []).filter((w) => w.group_id === g.id),
-    })),
+    groups: all.filter((g) => g.kind === 'words'),
+    texts: all.filter((g) => g.kind === 'text'),
     recordings: recordings.data ?? [],
     praise: praise.data ?? [],
   }

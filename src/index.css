@@ -1294,3 +1294,92 @@ textarea {
   border-bottom: 1px solid #eee4d4;
   padding: 4px 0;
 }
+
+/* Slow reading: the syllable being said lights up */
+.syl-lit {
+  border-radius: 12px;
+  padding: 0 0.04em;
+  transition: background 0.15s, color 0.15s;
+}
+.syl-lit.on {
+  background: var(--accent);
+  color: white;
+}
+.round-btn.slow {
+  background: #2fbf71;
+  box-shadow: 0 6px 0 #1f9657;
+}
+.read-text.sentence {
+  font-size: clamp(1.9rem, 8vw, 3rem);
+  line-height: 1.7;
+  display: inline-block;
+}
+
+/* Reading a text with automatic highlight */
+.text-auto {
+  gap: 18px;
+}
+.text-card {
+  background: var(--card);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 28px 20px;
+  width: 100%;
+  min-height: 30vh;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 4px 14px;
+  font-family: 'Frank Ruhl Libre', serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 9vw, 3.2rem);
+  line-height: 1.6;
+}
+.tword {
+  border-radius: 14px;
+  padding: 0 8px;
+  color: #b9afc9;
+  transition: background 0.12s, color 0.12s, transform 0.12s;
+}
+.tword.past {
+  color: var(--ink);
+}
+.tword.on {
+  background: var(--accent);
+  color: white;
+  transform: scale(1.08);
+}
+.pace {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pace input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+  padding: 0;
+  border: none;
+  background: none;
+}
+.pace-ends {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  color: var(--muted);
+}
+.text-preview {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 1.3rem;
+  margin: 4px 0 0;
+  direction: rtl;
+}
+select {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid #e8dfd0;
+  background: white;
+}

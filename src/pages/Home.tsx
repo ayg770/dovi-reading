@@ -5,15 +5,14 @@ import { Learner, getLearner } from '../lib/supabase'
 import { AnimalCollection, StarBar } from '../components/ui/StarBar'
 import { t } from '../lib/i18n'
 
-export type GameId = 'hear_syllable' | 'read_aloud'
+export type GameId = 'hear_syllable' | 'read_aloud' | 'read_text'
 
 type GameCard = { id: GameId | null; icon: string; title: string; subtitle: string }
 
 const GAMES: GameCard[] = [
   { id: 'hear_syllable', icon: '👂', title: t('שמע ובחר'), subtitle: t('שומעים ובוחרים') },
   { id: 'read_aloud', icon: '🗣️', title: t('קרא בקול'), subtitle: t('רואים וקוראים') },
-  { id: null, icon: '📖', title: t('איזו מילה?'), subtitle: t('בקרוב') },
-  { id: null, icon: '🔍', title: t('אותיות דומות'), subtitle: t('בקרוב') },
+  { id: 'read_text', icon: '📖', title: t('קריאת טקסט'), subtitle: t('טקסטים משלי') },
 ]
 
 type Props = {
