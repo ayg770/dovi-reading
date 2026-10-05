@@ -1196,3 +1196,36 @@ textarea {
 [dir='ltr'] .pick-card {
   align-items: flex-start;
 }
+
+/* Quick recording */
+.quick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.quick.panel {
+  align-items: stretch;
+}
+.quick .game-bar {
+  width: 100%;
+}
+.quick.done {
+  align-items: center;
+  text-align: center;
+}
+.quick-status {
+  min-height: 1.6em;
+  font-size: 1.2rem;
+}
+.check-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+.check-row input {
+  width: auto;
+  accent-color: var(--accent);
+  transform: scale(1.3);
+}

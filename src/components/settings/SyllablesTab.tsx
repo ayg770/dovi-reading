@@ -1,20 +1,27 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { NIKUD, SYLLABLE_LETTERS, currentPronunciation, syllableText } from '../../data/hebrew'
 import { deleteSyllableRecording, saveSyllableRecording } from '../../lib/admin'
 import { ownRecording, storageUrl, useContent } from '../../lib/content'
 import { t } from '../../lib/i18n'
 import { RecordButton } from '../ui/RecordButton'
+import { QuickRecord } from './QuickRecord'
 
 /** A grid of every letter × nikud; tap to record Dovi (or anyone) saying it. */
 export function SyllablesTab() {
   const content = useContent()
+  const [quick, setQuick] = useState(false)
   // content is read so the grid re-renders when recordings change
   const recorded = (letterId: number, nikudId: number) => (content ? ownRecording(letterId, nikudId) : undefined)
   const pron = currentPronunciation()
   const count = content.recordings.filter((r) => r.source === 'storage' && r.pronunciation === pron).length
 
+  if (quick) return <QuickRecord onExit={() => setQuick(false)} />
+
   return (
     <div className="panel">
+      <button className="btn primary" onClick={() => setQuick(true)}>
+        {t('⚡ הקלטה מהירה')}
+      </button>
       <p className="muted">
         {t('הקלטה של הברה מחליפה את הקול הממוחשב בכל המשחקים. מילה שכל ההברות שלה מוקלטות תושמע כחיבור של ההקלטות. הוקלטו {count} מתוך {total}.', {
           count,

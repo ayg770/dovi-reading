@@ -1,5 +1,6 @@
 // Content edits from the settings page. Every write needs the parent code (checked by RLS).
 import { LETTERS, NIKUD, currentPronunciation, hasNikud, parseText, stripNikud } from '../data/hebrew'
+import { trimSilence } from './audioTrim'
 import { getContent, ownRecording, refreshContent } from './content'
 import { Group, getLearnerId, removeAudio, supabase, uploadAudio } from './supabase'
 import { t } from './i18n'
@@ -22,7 +23,8 @@ function check<T extends { error: { message: string } | null }>(res: T): T {
 
 // --- Syllable recordings ----------------------------------------------------
 
-export async function saveSyllableRecording(letterId: number, nikudId: number, blob: Blob) {
+export async function saveSyllableRecording(letterId: number, nikudId: number, rawBlob: Blob) {
+  const blob = await trimSilence(rawBlob)
   const letter = LETTERS.find((l) => l.id === letterId)!
   const nikud = NIKUD.find((n) => n.id === nikudId)!
   const path = await uploadAudio('syllables', `${letter.key}_${nikud.key}`, blob)
@@ -140,7 +142,8 @@ export async function moveGroup(group: Group, direction: -1 | 1) {
   await refreshContent()
 }
 
-export async function saveWordRecording(wordId: string, oldPath: string | null, blob: Blob) {
+export async function saveWordRecording(wordId: string, oldPath: string | null, rawBlob: Blob) {
+  const blob = await trimSilence(rawBlob)
   const path = await uploadAudio('words', wordId, blob)
   check(await db().from('words').update({ audio_path: path }).eq('id', wordId))
   await removeAudio(oldPath)
