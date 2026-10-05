@@ -3,6 +3,8 @@ import { HearSyllableGame } from './components/games/HearSyllableGame'
 import { ReadAloudGame } from './components/games/ReadAloudGame'
 import { BuildWordGame } from './components/games/BuildWordGame'
 import { LetterGame } from './components/games/LetterGame'
+import { RsvpGame } from './components/games/RsvpGame'
+import { RsvpPicker, RsvpChoice } from './components/ui/RsvpPicker'
 import { TextAutoGame } from './components/games/TextAutoGame'
 import { TrainGame } from './components/games/TrainGame'
 import { ContentPicker } from './components/ui/ContentPicker'
@@ -35,6 +37,8 @@ type Screen =
   | { kind: 'letters'; mode: 'similar' | 'right' }
   | { kind: 'text-pick' }
   | { kind: 'text-auto'; groupId: string; pace: number }
+  | { kind: 'rsvp-pick' }
+  | { kind: 'rsvp'; choice: RsvpChoice }
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ kind: 'home' })
@@ -87,6 +91,12 @@ export default function App() {
       />
     )
 
+  if (screen.kind === 'rsvp-pick')
+    return <RsvpPicker onExit={home} onStart={(choice) => setScreen({ kind: 'rsvp', choice })} />
+
+  if (screen.kind === 'rsvp')
+    return <RsvpGame key={run} choice={screen.choice} onExit={home} onRestart={() => setRun((r) => r + 1)} />
+
   if (screen.kind === 'text-auto')
     return (
       <TextAutoGame key={run} groupId={screen.groupId} pace={screen.pace} onExit={home} onRestart={() => setRun((r) => r + 1)} />
@@ -129,6 +139,7 @@ export default function App() {
       userName={account.name}
       onPlay={(game) => {
         if (game === 'read_text') setScreen({ kind: 'text-pick' })
+        else if (game === 'rsvp') setScreen({ kind: 'rsvp-pick' })
         else if (game === 'similar_letters') setScreen({ kind: 'letters', mode: 'similar' })
         else if (game === 'right_letter') setScreen({ kind: 'letters', mode: 'right' })
         else if (isPicked(game)) setScreen({ kind: 'pick', game })

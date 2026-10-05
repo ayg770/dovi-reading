@@ -14,6 +14,7 @@ export type GameId =
   | 'similar_letters'
   | 'right_letter'
   | 'read_text'
+  | 'rsvp'
 
 type GameCard = { id: GameId | null; icon: string; title: string; subtitle: string }
 
@@ -25,6 +26,7 @@ const GAMES: GameCard[] = [
   { id: 'similar_letters', icon: '🔍', title: t('אותיות דומות'), subtitle: t('מי מהן?') },
   { id: 'right_letter', icon: '✅', title: t('האות הנכונה'), subtitle: t('הפוכה, שבורה, או נכונה?') },
   { id: 'read_text', icon: '📖', title: t('קריאת טקסט'), subtitle: t('טקסטים משלי') },
+  { id: 'rsvp', icon: '⚡', title: t('קריאה ברצף'), subtitle: t('מילים בזו אחר זו, בקצב שבוחרים') },
 ]
 
 type Props = {

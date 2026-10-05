@@ -12,6 +12,7 @@ const GAME_NAMES: Record<string, string> = {
   similar_letters: 'אותיות דומות',
   right_letter: 'האות הנכונה',
   read_text: 'קריאת טקסט',
+  rsvp: 'קריאה ברצף',
 }
 
 function cellClass(row?: ProgressRow): string {
