@@ -1,9 +1,8 @@
 import {
-  LETTERS,
   Letter,
-  NIKUD,
   Syllable,
   WordSyllable,
+  asOpenSyllable,
   syllableKey,
   syllableSpeechText,
   wordSpeechText,
@@ -79,17 +78,10 @@ export async function playSyllable(s: Syllable) {
   await speak(syllableSpeechText(s))
 }
 
-/** An open syllable (letter + known nikud, nothing after it) that has a recording. */
+/** A single syllable (consonant + vowel) that has a recording. */
 function syllableRecording(s: WordSyllable): string | null {
-  if (!s.letter_id || !s.nikud_id) return null
-  const letter = LETTERS.find((l) => l.id === s.letter_id)
-  const nikud = NIKUD.find((n) => n.id === s.nikud_id)
-  if (!letter || !nikud) return null
-  const bare = (letter.dagesh ?? letter.glyph) + nikud.mark
-  const plain = letter.glyph + nikud.mark
-  if (s.text.normalize('NFC') !== bare.normalize('NFC') && s.text.normalize('NFC') !== plain.normalize('NFC'))
-    return null
-  return recordedSyllableUrl(s.letter_id, s.nikud_id)
+  const open = asOpenSyllable(s)
+  return open ? recordedSyllableUrl(open.letter.id, open.nikud.id) : null
 }
 
 export type Playable = { text: string; syllables: WordSyllable[]; audio_path?: string | null }

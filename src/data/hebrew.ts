@@ -13,7 +13,7 @@ export type Letter = {
 
 export type Nikud = {
   id: number
-  key: 'patach' | 'hiriq' | 'kamatz'
+  key: 'patach' | 'hiriq' | 'kamatz' | 'segol' | 'tsere' | 'holam' | 'kubutz' | 'shuruk'
   mark: string
   name: string
 }
@@ -52,7 +52,17 @@ export const NIKUD: Nikud[] = [
   { id: 1, key: 'patach', mark: 'ַ', name: 'פתח' },
   { id: 2, key: 'hiriq', mark: 'ִ', name: 'חיריק' },
   { id: 3, key: 'kamatz', mark: 'ָ', name: 'קמץ' },
+  // More vowels: chosen as extra categories (games, recordings)
+  { id: 4, key: 'segol', mark: 'ֶ', name: 'סגול' },
+  { id: 5, key: 'tsere', mark: 'ֵ', name: 'צירה' },
+  { id: 6, key: 'holam', mark: 'ֹ', name: 'חולם' },
+  { id: 7, key: 'kubutz', mark: 'ֻ', name: 'קובוץ' },
+  // Shuruk is a vav with a dot after the letter: the "mark" is those two characters.
+  { id: 8, key: 'shuruk', mark: 'וּ', name: 'שורוק' },
 ]
+
+/** The three vowels a beginner starts with; the rest are optional categories. */
+export const BASIC_NIKUD_IDS = [1, 2, 3]
 
 /** Letters that can open a syllable (no final forms). */
 export const SYLLABLE_LETTERS = LETTERS.filter((l) => !l.isFinal)
@@ -189,6 +199,7 @@ const markVowel = (mark: string): Vowel | undefined => VOWEL_OF_MARK[pronunciati
 
 /** How this nikud sounds for the current user. */
 export function nikudVowel(n: Nikud): Vowel {
+  if (n.key === 'shuruk') return 'u'
   return markVowel(n.mark) ?? ''
 }
 
@@ -228,6 +239,26 @@ function vowelOf(u: Unit): Vowel {
   return ''
 }
 
+/** Shuruk (וּ) or holam male (וֹ): the nikud a vav stands for. */
+function vavNikudId(marks: string): number | null {
+  return NIKUD.find((n) => n.key === (marks === DAGESH ? 'shuruk' : 'holam'))?.id ?? null
+}
+
+/**
+ * The letter and nikud of a syllable that is just one consonant and its vowel
+ * (including holam male / shuruk), or null for anything longer. Recordings of
+ * single syllables are found through this.
+ */
+export function asOpenSyllable(ws: WordSyllable): Syllable | null {
+  if (!ws.letter_id || !ws.nikud_id) return null
+  const units = toUnits(ws.text)
+  const carried = units.length === 2 && units[1].glyph === 'ו' && (units[1].marks === DAGESH || units[1].marks === HOLAM)
+  if (units.length !== 1 && !carried) return null
+  const letter = LETTERS.find((l) => l.id === ws.letter_id)
+  const nikud = NIKUD.find((n) => n.id === ws.nikud_id)
+  return letter && nikud ? { letter, nikud } : null
+}
+
 /**
  * Split a pointed word into syllables. A letter with a vowel opens a syllable;
  * letters without one (or with sheva) close the syllable before them. וֹ and וּ
@@ -251,6 +282,7 @@ export function parseWord(text: string): WordSyllable[] {
       const vowel: Vowel = u.marks === DAGESH ? 'u' : (markVowel(HOLAM) ?? 'o')
       if (prev.units.length === 1) {
         prev.vowel = vowel
+        prev.nikud_id = vavNikudId(u.marks)
         prev.units.push(u)
       } else {
         // The letter before was taken as a closing consonant; it actually opens this syllable.
@@ -258,7 +290,7 @@ export function parseWord(text: string): WordSyllable[] {
         out.push({
           text: '',
           letter_id: LETTERS.find((l) => l.glyph === prevUnit.glyph)?.id ?? null,
-          nikud_id: null,
+          nikud_id: vavNikudId(u.marks),
           vowel,
           units: [prevUnit, u],
         })

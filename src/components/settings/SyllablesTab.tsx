@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { NIKUD, SYLLABLE_LETTERS, currentPronunciation, syllableText } from '../../data/hebrew'
+import { BASIC_NIKUD_IDS, NIKUD, SYLLABLE_LETTERS, currentPronunciation, syllableText } from '../../data/hebrew'
 import { deleteSyllableRecording, saveSyllableRecording } from '../../lib/admin'
 import { ownRecording, storageUrl, useContent } from '../../lib/content'
 import { t } from '../../lib/i18n'
@@ -10,10 +10,14 @@ import { QuickRecord } from './QuickRecord'
 export function SyllablesTab() {
   const content = useContent()
   const [quick, setQuick] = useState(false)
+  const [more, setMore] = useState(false)
+  const shown = more ? NIKUD : NIKUD.filter((n) => BASIC_NIKUD_IDS.includes(n.id))
   // content is read so the grid re-renders when recordings change
   const recorded = (letterId: number, nikudId: number) => (content ? ownRecording(letterId, nikudId) : undefined)
   const pron = currentPronunciation()
-  const count = content.recordings.filter((r) => r.source === 'storage' && r.pronunciation === pron).length
+  const count = content.recordings.filter(
+    (r) => r.source === 'storage' && r.pronunciation === pron && shown.some((n) => n.id === r.nikud_id),
+  ).length
 
   if (quick) return <QuickRecord onExit={() => setQuick(false)} />
 
@@ -25,12 +29,16 @@ export function SyllablesTab() {
       <p className="muted">
         {t('הקלטה של הברה מחליפה את הקול הממוחשב בכל המשחקים. מילה שכל ההברות שלה מוקלטות תושמע כחיבור של ההקלטות. הוקלטו {count} מתוך {total}.', {
           count,
-          total: SYLLABLE_LETTERS.length * NIKUD.length,
+          total: SYLLABLE_LETTERS.length * shown.length,
         })}
       </p>
-      <div className="syl-grid">
+      <label className="check-row">
+        <input type="checkbox" checked={more} onChange={(e) => setMore(e.target.checked)} />
+        {t('להציג גם ניקודים נוספים')}
+      </label>
+      <div className="syl-grid" style={{ gridTemplateColumns: `2.5em repeat(${shown.length}, 1fr)` }}>
         <div className="syl-head" />
-        {NIKUD.map((n) => (
+        {shown.map((n) => (
           <div key={n.id} className="syl-head">
             {t(n.name)}
           </div>
@@ -38,7 +46,7 @@ export function SyllablesTab() {
         {SYLLABLE_LETTERS.map((letter) => (
           <Fragment key={letter.id}>
             <div className="syl-letter">{letter.glyph}</div>
-            {NIKUD.map((nikud) => {
+            {shown.map((nikud) => {
               const r = recorded(letter.id, nikud.id)
               return (
                 <div key={nikud.id} className={r ? 'syl-cell done' : 'syl-cell'}>

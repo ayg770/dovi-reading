@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { playItem, playUrl, praise, sfx, speakUi, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
 import { Item, groupItems, randomSyllableItems } from '../../lib/items'
-import { Selection } from '../../lib/selection'
+import { Selection, roundsOf, windowItems } from '../../lib/selection'
 import { earnStar } from '../../lib/stars'
 import { Recording, canRecord, startRecording } from '../../lib/recorder'
 import { Listening, canRecognize, heardMatches, listen } from '../../lib/speech'
@@ -15,7 +15,6 @@ import { Stars } from '../ui/Stars'
 import { t } from '../../lib/i18n'
 
 const GAME_TYPE = 'read_aloud'
-const RANDOM_ROUNDS = 10
 const MAX_TRIES = 3
 /** After this many attempts where the recognizer heard nothing, a grown-up decides. */
 const MAX_EMPTY = 2
@@ -100,10 +99,10 @@ export function ReadAloudGame({ selection, onExit, onRestart, onPlayGroup }: Pro
       const group =
         selection.kind === 'group' ? content.groups.find((g) => g.id === selection.groupId) : null
       if (group && group.words.length) {
-        setItems(groupItems(group))
+        setItems(windowItems(groupItems(group), group.id, roundsOf(selection)))
         setGroupName(group.name)
       } else {
-        setItems(randomSyllableItems(RANDOM_ROUNDS, selection.kind === 'singles' ? selection.nikudIds : undefined))
+        setItems(randomSyllableItems(roundsOf(selection) || 10, selection.kind === 'singles' ? selection.nikudIds : undefined))
       }
     })
     return () => {

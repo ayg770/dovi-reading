@@ -1,9 +1,9 @@
 import {
-  LETTERS,
   NIKUD,
   SYLLABLE_LETTERS,
   Syllable,
   WordSyllable,
+  asOpenSyllable,
   nikudVowel,
   parseText,
   syllableText,
@@ -58,13 +58,5 @@ export function randomSyllableItems(count: number, nikudIds: number[] = NIKUD.ma
 
 /** The letter+nikud of a one-syllable item, so it can use syllable recordings and the letter hint. */
 export function asSyllable(item: Item): Syllable | null {
-  if (item.syllables.length !== 1) return null
-  const s = item.syllables[0]
-  const letter = LETTERS.find((l) => l.id === s.letter_id)
-  const nikud = NIKUD.find((n) => n.id === s.nikud_id)
-  if (!letter || !nikud) return null
-  const plain = (letter.dagesh ?? letter.glyph) + nikud.mark
-  const bare = letter.glyph + nikud.mark
-  const t = item.text.normalize('NFC')
-  return t === plain.normalize('NFC') || t === bare.normalize('NFC') ? { letter, nikud } : null
+  return item.syllables.length === 1 ? asOpenSyllable(item.syllables[0]) : null
 }

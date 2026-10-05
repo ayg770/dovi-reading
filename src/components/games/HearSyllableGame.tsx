@@ -4,7 +4,7 @@ import { playItem, playLetterName, praise, sfx } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
 import { Item, asSyllable, groupItems, syllableItem } from '../../lib/items'
 import { makeQuestion, makeWordQuestion } from '../../lib/questions'
-import { Selection } from '../../lib/selection'
+import { Selection, roundsOf, windowItems } from '../../lib/selection'
 import { earnStar } from '../../lib/stars'
 import {
   ProgressRow,
@@ -19,7 +19,6 @@ import { StarBar } from '../ui/StarBar'
 import { Stars } from '../ui/Stars'
 import { t } from '../../lib/i18n'
 
-const SINGLES_ROUNDS = 10
 const GAME_TYPE = 'hear_syllable'
 
 type Status = 'asking' | 'right' | 'wrong'
@@ -38,6 +37,7 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
   const [ready, setReady] = useState(false)
   const [progress, setProgress] = useState<ProgressRow[]>([])
   const [groupWords, setGroupWords] = useState<Item[] | null>(null)
+  const [groupPool, setGroupPool] = useState<Item[]>([])
   const [groupName, setGroupName] = useState<string | null>(null)
   const [round, setRound] = useState(0)
   const [score, setScore] = useState(0)
@@ -55,7 +55,7 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
   const scoreRef = useRef(0)
 
   const nikudIds = selection.kind === 'singles' ? selection.nikudIds : []
-  const total = groupWords ? groupWords.length : SINGLES_ROUNDS
+  const total = groupWords ? groupWords.length : roundsOf(selection) || 10
 
   const singlesQuestion = useCallback(
     (rows: ProgressRow[]): Round => {
@@ -74,10 +74,12 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
         selection.kind === 'group' ? content.groups.find((g) => g.id === selection.groupId) : null
       if (group && group.words.length) {
         // A group plays its words in order, each against the most similar others.
-        const words = groupItems(group)
+        const all = groupItems(group)
+        const words = windowItems(all, group.id, roundsOf(selection))
+        setGroupPool(all)
         setGroupWords(words)
         setGroupName(group.name)
-        setQuestion(makeWordQuestion(words[0], words))
+        setQuestion(makeWordQuestion(words[0], all))
       } else {
         setQuestion(singlesQuestion(rows))
       }
@@ -98,11 +100,11 @@ export function HearSyllableGame({ selection, onExit, onRestart, onPlayGroup }: 
       return
     }
     setRound((r) => r + 1)
-    setQuestion(groupWords ? makeWordQuestion(groupWords[round + 1], groupWords) : singlesQuestion(progress))
+    setQuestion(groupWords ? makeWordQuestion(groupWords[round + 1], groupPool) : singlesQuestion(progress))
     setStatus('asking')
     setPicked(null)
     setFirstTry(true)
-  }, [round, total, question, progress, groupWords, singlesQuestion])
+  }, [round, total, question, progress, groupWords, groupPool, singlesQuestion])
 
   if (!ready || !question) return <div className="game loading">…</div>
 

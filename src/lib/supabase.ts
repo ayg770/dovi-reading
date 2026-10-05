@@ -121,16 +121,45 @@ export async function updateProfile(fields: { name?: string; pronunciation?: Pro
   if (error) throw new Error(error.message.includes('users_name_key') ? t('השם הזה כבר תפוס, נסו שם אחר') : error.message)
 }
 
-export type ProgressRow = { letter_id: number; nikud_id: number; attempts: number; correct: number }
+export type ProgressRow = {
+  letter_id: number
+  nikud_id: number
+  attempts: number
+  correct: number
+  last_seen_at?: string
+}
 
 export async function loadProgress(): Promise<ProgressRow[]> {
   const userId = await getLearnerId()
   if (!supabase || !userId) return []
   const { data, error } = await supabase
     .from('progress')
-    .select('letter_id, nikud_id, attempts, correct')
+    .select('letter_id, nikud_id, attempts, correct, last_seen_at')
     .eq('user_id', userId)
   if (error) console.warn('supabase: could not load progress', error)
+  return data ?? []
+}
+
+export type SessionRow = {
+  id: string
+  game_type: string
+  started_at: string
+  total_questions: number
+  correct_answers: number
+}
+
+/** The latest games played (for the parent's progress screen). */
+export async function loadSessions(limit = 15): Promise<SessionRow[]> {
+  const userId = await getLearnerId()
+  if (!supabase || !userId) return []
+  const { data, error } = await supabase
+    .from('game_sessions')
+    .select('id, game_type, started_at, total_questions, correct_answers')
+    .eq('user_id', userId)
+    .gt('total_questions', 0)
+    .order('started_at', { ascending: false })
+    .limit(limit)
+  if (error) console.warn('supabase: could not load sessions', error)
   return data ?? []
 }
 

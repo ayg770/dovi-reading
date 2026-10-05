@@ -17,6 +17,13 @@ function shuffle<T>(arr: T[]): T[] {
 
 const same = (a: Syllable, b: Syllable) => a.letter.id === b.letter.id && a.nikud.id === b.nikud.id
 
+/** Syllables not practiced for a few days come back: up to 2.5x after about 10 days. */
+function staleness(row: ProgressRow): number {
+  if (!row.last_seen_at) return 1
+  const days = (Date.now() - new Date(row.last_seen_at).getTime()) / 86400000
+  return 1 + Math.min(1.5, Math.max(0, days - 1) / 6)
+}
+
 /**
  * Weight each syllable by how shaky it is: unseen = 3, then 1 + error rate * 4.
  * Syllables Dovi keeps missing come up more often.
@@ -28,7 +35,7 @@ function weightedAnswer(progress: ProgressRow[], recent: Syllable[], from: Sylla
   for (const s of from) {
     if (avoid.some((r) => same(r, s))) continue
     const row = progress.find((p) => p.letter_id === s.letter.id && p.nikud_id === s.nikud.id)
-    const w = !row || row.attempts === 0 ? 3 : 1 + (1 - row.correct / row.attempts) * 4
+    const w = !row || row.attempts === 0 ? 3 : (1 + (1 - row.correct / row.attempts) * 4) * staleness(row)
     pool.push({ s, w })
   }
   let r = Math.random() * pool.reduce((sum, p) => sum + p.w, 0)

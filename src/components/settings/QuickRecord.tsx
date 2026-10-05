@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { NIKUD, SYLLABLE_LETTERS, Syllable, syllableText } from '../../data/hebrew'
+import { BASIC_NIKUD_IDS, NIKUD, SYLLABLE_LETTERS, Syllable, syllableText } from '../../data/hebrew'
 import { saveSyllableRecording } from '../../lib/admin'
 import { playUrl, sfx, stopAudio } from '../../lib/audio'
 import { ownRecording, storageUrl } from '../../lib/content'
@@ -18,7 +18,7 @@ type Phase = 'setup' | 'record' | 'done'
  */
 export function QuickRecord({ onExit }: { onExit: () => void }) {
   const [phase, setPhase] = useState<Phase>('setup')
-  const [nikudIds, setNikudIds] = useState<number[]>(NIKUD.map((n) => n.id))
+  const [nikudIds, setNikudIds] = useState<number[]>(BASIC_NIKUD_IDS)
   const [onlyMissing, setOnlyMissing] = useState(true)
   const [queue, setQueue] = useState<Syllable[]>([])
   const [index, setIndex] = useState(0)

@@ -5,8 +5,10 @@ import {
   createGroup,
   deleteGroup,
   deleteWordRecording,
+  duplicateGroup,
   moveGroup,
   saveWordRecording,
+  splitGroup,
   splitLines,
   updateGroup,
 } from '../../lib/admin'
@@ -81,6 +83,24 @@ export function GroupsTab() {
                   title={t('למטה')}
                 >
                   ↓
+                </button>
+                <button
+                  className="rec-btn"
+                  onClick={() => void run(() => duplicateGroup(g, t('עותק')))}
+                  title={t('שכפול')}
+                >
+                  📄
+                </button>
+                <button
+                  className="rec-btn"
+                  disabled={g.words.length < 2}
+                  onClick={() => {
+                    const n = Number(prompt(t('לחלק לקבוצות של כמה פריטים?'), '10'))
+                    if (n >= 1) void run(() => splitGroup(g, Math.floor(n)))
+                  }}
+                  title={t('חלוקה לקבוצות קטנות')}
+                >
+                  ✂️
                 </button>
                 <button className="rec-btn" onClick={() => setEditing(g)} title={t('עריכה')}>
                   ✏️

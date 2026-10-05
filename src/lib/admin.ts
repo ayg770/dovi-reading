@@ -90,6 +90,29 @@ function wordRow(userId: string, groupId: string, text: string, sortOrder: numbe
   }
 }
 
+/** A copy of a group (without its word recordings). */
+export async function duplicateGroup(group: Group, copyWord: string) {
+  await createGroup(`${group.name} (${copyWord})`, group.words.map((w) => w.text))
+}
+
+/** Cut a long group into several of at most `size` words, in order. */
+export async function splitGroup(group: Group, size: number) {
+  const words = group.words
+  if (size < 1 || words.length <= size) return
+  const owner = await me()
+  const groups = getContent().groups
+  let sortOrder = groups.length ? Math.max(...groups.map((g) => g.sort_order)) + 1 : 1
+  const parts = Math.ceil(words.length / size)
+  for (let p = 0; p < parts; p++) {
+    const { data } = check(
+      await db().from('word_groups').insert({ name: `${group.name} ${p + 1}`, sort_order: sortOrder++, user_id: owner }).select('id').single(),
+    )
+    const slice = words.slice(p * size, (p + 1) * size)
+    check(await db().from('words').insert(slice.map((w, i) => wordRow(owner, data!.id, w.text, i + 1))))
+  }
+  await refreshContent()
+}
+
 export async function createGroup(name: string, lines: string[]) {
   const owner = await me()
   const groups = getContent().groups

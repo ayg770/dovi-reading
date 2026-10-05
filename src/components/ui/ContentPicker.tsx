@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { NIKUD } from '../../data/hebrew'
+import { BASIC_NIKUD_IDS, NIKUD } from '../../data/hebrew'
 import { useContent } from '../../lib/content'
-import { Selection, loadSelection, saveSelection } from '../../lib/selection'
+import { ROUND_CHOICES, Selection, defaultRounds, loadSelection, roundsOf, saveSelection } from '../../lib/selection'
 import { Learner, getLearner } from '../../lib/supabase'
 import { t } from '../../lib/i18n'
 
@@ -19,8 +19,9 @@ export function ContentPicker({ game, title, icon, onStart, onExit }: Props) {
   const [learner, setLearner] = useState<Learner | null>(null)
   const [sel, setSel] = useState<Selection | null>(() => loadSelection(game))
   const [nikudIds, setNikudIds] = useState<number[]>(
-    sel?.kind === 'singles' ? sel.nikudIds : NIKUD.map((n) => n.id),
+    sel?.kind === 'singles' ? sel.nikudIds : BASIC_NIKUD_IDS,
   )
+  const [rounds, setRounds] = useState<number | null>(sel?.rounds ?? null)
 
   const groups = content.groups.filter((g) => g.words.length)
 
@@ -36,10 +37,11 @@ export function ContentPicker({ game, title, icon, onStart, onExit }: Props) {
   }, [learner, groups, sel])
 
   // A remembered group that was deleted in the meantime.
-  const chosen: Selection =
+  const base: Selection =
     sel?.kind === 'group' && !groups.some((g) => g.id === sel.groupId)
       ? { kind: 'singles', nikudIds }
       : sel ?? { kind: 'singles', nikudIds }
+  const chosen: Selection = { ...base, rounds: rounds ?? defaultRounds(base.kind) }
 
   const toggleNikud = (id: number) => {
     const next = nikudIds.includes(id) ? nikudIds.filter((n) => n !== id) : [...nikudIds, id]
@@ -109,6 +111,16 @@ export function ContentPicker({ game, title, icon, onStart, onExit }: Props) {
           </span>
         </button>
       ))}
+
+      <p className="picker-sub">{t('כמה סיבובים?')}</p>
+      <div className="nikud-toggles">
+        {ROUND_CHOICES.map((r) => (
+          <button key={r} className={roundsOf(chosen) === r ? 'toggle on' : 'toggle'} onClick={() => setRounds(r)}>
+            <span className="toggle-sample">{r === 0 ? '∞' : r}</span>
+            {r === 0 ? t('הכל') : ''}
+          </button>
+        ))}
+      </div>
 
       <button className="btn primary start-btn" onClick={start}>
         {t('יאללה! ▶')}
