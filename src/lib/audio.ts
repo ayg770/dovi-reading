@@ -8,9 +8,8 @@ import {
   syllableSpeechText,
   wordSpeechText,
 } from '../data/hebrew'
-import { praiseUrls, recordedSyllableUrl } from './content'
+import { praiseUrls, recordedSyllableUrl, storageUrl } from './content'
 import { Item, asSyllable } from './items'
-import { storageUrl } from './supabase'
 
 const BASE = import.meta.env.BASE_URL
 

@@ -4,6 +4,8 @@ import {
   SYLLABLE_LETTERS,
   Syllable,
   WordSyllable,
+  nikudVowel,
+  parseText,
   syllableText,
 } from '../data/hebrew'
 import { findGroup } from './content'
@@ -22,7 +24,7 @@ export function syllableItem(s: Syllable): Item {
   return {
     key: `${s.letter.id}_${s.nikud.id}`,
     text,
-    syllables: [{ text, letter_id: s.letter.id, nikud_id: s.nikud.id, vowel: s.nikud.sound }],
+    syllables: [{ text, letter_id: s.letter.id, nikud_id: s.nikud.id, vowel: nikudVowel(s.nikud) }],
   }
 }
 
@@ -36,7 +38,8 @@ export function groupItems(group: Group): Item[] {
   return group.words.map((w) => ({
     key: w.id,
     text: w.text,
-    syllables: w.syllables,
+    // From the text, in this user's pronunciation (the stored copy may be another's).
+    syllables: parseText(w.text),
     audio_path: w.audio_path,
   }))
 }

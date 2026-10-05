@@ -15,9 +15,14 @@ const GAMES: GameCard[] = [
   { id: null, icon: '🔍', title: 'אותיות דומות', subtitle: 'בקרוב' },
 ]
 
-type Props = { onPlay: (id: GameId) => void; onSettings: () => void }
+type Props = {
+  userName: string
+  onPlay: (id: GameId) => void
+  onSettings: () => void
+  onSwitchUser: () => void
+}
 
-export function Home({ onPlay, onSettings }: Props) {
+export function Home({ userName, onPlay, onSettings, onSwitchUser }: Props) {
   const content = useContent()
   const [learner, setLearner] = useState<Learner | null>(null)
   useEffect(() => {
@@ -27,12 +32,18 @@ export function Home({ onPlay, onSettings }: Props) {
 
   return (
     <div className="home">
-      <button className="settings-btn" onClick={onSettings} aria-label="הגדרות">
-        ⚙️
-      </button>
       <StarBar />
+      <div className="home-top">
+        <button className="user-chip" onClick={onSwitchUser} aria-label="החלפת משתמש">
+          <span className="who-avatar small">{userName.slice(0, 1)}</span>
+          {userName} ⇄
+        </button>
+        <button className="settings-btn" onClick={onSettings} aria-label="הגדרות">
+          ⚙️
+        </button>
+      </div>
       <h1>
-        דובי <span>קורא</span>
+        {userName} <span>קורא</span>
       </h1>
       <p className="nikud-row">בַּ בִּ בָּ</p>
       {group && <p className="group-tag">⭐ {group.name}</p>}

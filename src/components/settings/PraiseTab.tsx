@@ -1,16 +1,15 @@
 import { addPraiseClip, deletePraiseClip } from '../../lib/admin'
 import { playUrl } from '../../lib/audio'
-import { useContent } from '../../lib/content'
-import { storageUrl } from '../../lib/supabase'
+import { storageUrl, useContent } from '../../lib/content'
 import { RecordButton } from '../ui/RecordButton'
 
-/** Short cheers ("כל הכבוד דובי!") played at random after a right answer. */
+/** Short cheers ("כל הכבוד!") played at random after a right answer. */
 export function PraiseTab() {
   const { praise } = useContent()
   return (
     <div className="panel">
       <p className="muted">
-        הקליטו משפטי עידוד קצרים בקול שלכם ("כל הכבוד דובי!", "וואו, איזה קורא!"). אחרי תשובה נכונה
+        הקליטו משפטי עידוד קצרים בקול שלכם ("כל הכבוד!", "וואו, איזה קורא!"). אחרי תשובה נכונה
         יושמע אחד מהם באקראי. כל עוד אין הקלטות, הקול הממוחשב אומר "כל הכבוד!", "יופי!" וכדומה.
       </p>
       <ul className="praise-list">

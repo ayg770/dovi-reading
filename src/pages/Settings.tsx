@@ -2,25 +2,32 @@ import { useEffect, useRef, useState } from 'react'
 import { GroupsTab } from '../components/settings/GroupsTab'
 import { PraiseTab } from '../components/settings/PraiseTab'
 import { SyllablesTab } from '../components/settings/SyllablesTab'
-import {
-  isParentUnlocked,
-  lockParent,
-  parentCodeExists,
-  setParentCode,
-  unlockParent,
-} from '../lib/supabase'
+import { Pronunciation, currentPronunciation } from '../data/hebrew'
+import { currentAccount, forgetAccount, setStoredCode, setStoredName, switchAccount } from '../lib/account'
+import { changeCode, updateProfile } from '../lib/supabase'
 
-type Tab = 'groups' | 'syllables' | 'praise' | 'code'
+type Tab = 'groups' | 'syllables' | 'praise' | 'profile'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'groups', label: '📚 קבוצות מילים' },
   { id: 'syllables', label: '🎙️ הקלטות הברות' },
   { id: 'praise', label: '🎉 עידוד' },
-  { id: 'code', label: '🔒 קוד הורה' },
+  { id: 'profile', label: '👤 פרופיל' },
 ]
 
+const UNLOCK_KEY = 'dovi-settings-unlocked'
+
+/** Settings open with the user's code each visit, so a child can play but not edit. */
+function isUnlocked(): boolean {
+  try {
+    return sessionStorage.getItem(UNLOCK_KEY) === currentAccount()?.id
+  } catch {
+    return false
+  }
+}
+
 export function Settings({ onExit }: { onExit: () => void }) {
-  const [unlocked, setUnlocked] = useState(isParentUnlocked())
+  const [unlocked, setUnlocked] = useState(isUnlocked())
   const [tab, setTab] = useState<Tab>('groups')
 
   return (
@@ -32,16 +39,12 @@ export function Settings({ onExit }: { onExit: () => void }) {
         </button>
       </header>
       {!unlocked ? (
-        <ParentGate onUnlock={() => setUnlocked(true)} />
+        <CodeGate onUnlock={() => setUnlocked(true)} />
       ) : (
         <>
           <nav className="tabs">
             {TABS.map((t) => (
-              <button
-                key={t.id}
-                className={tab === t.id ? 'tab on' : 'tab'}
-                onClick={() => setTab(t.id)}
-              >
+              <button key={t.id} className={tab === t.id ? 'tab on' : 'tab'} onClick={() => setTab(t.id)}>
                 {t.label}
               </button>
             ))}
@@ -49,10 +52,14 @@ export function Settings({ onExit }: { onExit: () => void }) {
           {tab === 'groups' && <GroupsTab />}
           {tab === 'syllables' && <SyllablesTab />}
           {tab === 'praise' && <PraiseTab />}
-          {tab === 'code' && (
-            <CodeTab
+          {tab === 'profile' && (
+            <ProfileTab
               onLock={() => {
-                lockParent()
+                try {
+                  sessionStorage.removeItem(UNLOCK_KEY)
+                } catch {
+                  // ignore
+                }
                 setUnlocked(false)
               }}
             />
@@ -63,104 +70,145 @@ export function Settings({ onExit }: { onExit: () => void }) {
   )
 }
 
-function ParentGate({ onUnlock }: { onUnlock: () => void }) {
-  const [exists, setExists] = useState<boolean | null>(null)
+function CodeGate({ onUnlock }: { onUnlock: () => void }) {
+  const account = currentAccount()
   const [code, setCode] = useState('')
-  const [again, setAgain] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  useEffect(() => input.current?.focus(), [])
 
-  useEffect(() => {
-    void parentCodeExists().then(setExists)
-  }, [])
-  useEffect(() => input.current?.focus(), [exists])
-
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setBusy(true)
-    if (exists) {
-      if (await unlockParent(code)) onUnlock()
-      else setError('קוד שגוי')
-    } else {
-      if (code.length < 6) setError('לפחות 6 תווים')
-      else if (code !== again) setError('הקודים לא זהים')
-      else {
-        const err = await setParentCode(code)
-        if (err) setError(err)
-        else onUnlock()
-      }
+    if (!account || code !== account.code) return setError('קוד שגוי')
+    try {
+      sessionStorage.setItem(UNLOCK_KEY, account.id)
+    } catch {
+      // stays unlocked until the settings close
     }
-    setBusy(false)
+    onUnlock()
   }
-
-  if (exists === null) return <p className="muted">…</p>
 
   return (
     <form className="gate" onSubmit={submit}>
-      <p>
-        {exists
-          ? 'ההגדרות מיועדות להורים. הכנס את קוד ההורה:'
-          : 'בפעם הראשונה בוחרים קוד הורה (לפחות 6 תווים). הוא שומר שרק מי שיודע אותו יכול לשנות מילים והקלטות.'}
-      </p>
+      <p>כדי לשנות הגדרות של {account?.name}, הכניסו את הקוד האישי:</p>
       <input
         ref={input}
         type="password"
-        inputMode="text"
-        autoComplete={exists ? 'current-password' : 'new-password'}
-        placeholder="קוד הורה"
+        autoComplete="current-password"
+        placeholder="קוד אישי"
         value={code}
         onChange={(e) => setCode(e.target.value)}
       />
-      {!exists && (
-        <input
-          type="password"
-          autoComplete="new-password"
-          placeholder="שוב, לאימות"
-          value={again}
-          onChange={(e) => setAgain(e.target.value)}
-        />
-      )}
       {error && <p className="error">{error}</p>}
-      <button className="btn primary" disabled={busy || !code}>
-        {exists ? 'כניסה' : 'שמור קוד'}
+      <button className="btn primary" disabled={!code}>
+        כניסה
       </button>
     </form>
   )
 }
 
-function CodeTab({ onLock }: { onLock: () => void }) {
+function ProfileTab({ onLock }: { onLock: () => void }) {
+  const account = currentAccount()!
+  const [name, setName] = useState(account.name)
+  const [pron, setPron] = useState<Pronunciation>(currentPronunciation())
   const [code, setCode] = useState('')
   const [again, setAgain] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  const change = async (e: React.FormEvent) => {
+  const run = async (fn: () => Promise<void>) => {
+    setMsg(null)
+    setBusy(true)
+    try {
+      await fn()
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'משהו השתבש')
+    }
+    setBusy(false)
+  }
+
+  const saveProfile = (e: React.FormEvent) => {
     e.preventDefault()
-    if (code.length < 6) return setMsg('לפחות 6 תווים')
+    void run(async () => {
+      await updateProfile({ name: name.trim(), pronunciation: pron })
+      setStoredName(account.id, name.trim())
+      // Pronunciation changes how everything sounds and is checked: start fresh.
+      location.reload()
+    })
+  }
+
+  const saveCode = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (code.length < 4) return setMsg('הקוד צריך להיות לפחות 4 תווים')
     if (code !== again) return setMsg('הקודים לא זהים')
-    const err = await setParentCode(code)
-    setMsg(err ?? 'הקוד הוחלף ✓')
-    setCode('')
-    setAgain('')
+    void run(async () => {
+      await changeCode(code)
+      setStoredCode(account.id, code)
+      location.reload()
+    })
   }
 
   return (
     <div className="panel">
-      <form className="gate" onSubmit={change}>
-        <p>החלפת קוד הורה:</p>
-        <input type="password" autoComplete="new-password" placeholder="קוד חדש" value={code} onChange={(e) => setCode(e.target.value)} />
-        <input type="password" autoComplete="new-password" placeholder="שוב, לאימות" value={again} onChange={(e) => setAgain(e.target.value)} />
-        {msg && <p className="muted">{msg}</p>}
-        <button className="btn primary" disabled={!code}>
-          החלף קוד
+      <form className="gate" onSubmit={saveProfile}>
+        <label>
+          שם
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <p className="field-title">הגייה</p>
+        <div className="pron-options">
+          <button
+            type="button"
+            className={pron === 'ashkenazi' ? 'pick-card on' : 'pick-card'}
+            onClick={() => setPron('ashkenazi')}
+          >
+            <span className="pick-name">אשכנזית</span>
+            <span className="pron-sample">בָּ = "bo" · בֹּ = "boy" · בֵּ = "bey"</span>
+          </button>
+          <button
+            type="button"
+            className={pron === 'sephardi' ? 'pick-card on' : 'pick-card'}
+            onClick={() => setPron('sephardi')}
+          >
+            <span className="pick-name">רגילה</span>
+            <span className="pron-sample">בָּ = "ba" · בֹּ = "bo" · בֵּ = "be"</span>
+          </button>
+        </div>
+        <p className="muted">הקלטות נשמרות לפי הגייה: אחרי מעבר, ההקלטות של ההגייה הקודמת לא יושמעו.</p>
+        <button className="btn primary" disabled={busy || (name.trim() === account.name && pron === currentPronunciation())}>
+          שמירה
         </button>
       </form>
+
       <hr />
-      <p className="muted">הכניסה נשמרת עד סגירת הלשונית בדפדפן.</p>
-      <button className="btn" onClick={onLock}>
-        🔒 נעל עכשיו
-      </button>
+      <form className="gate" onSubmit={saveCode}>
+        <p>החלפת קוד אישי:</p>
+        <input type="password" autoComplete="new-password" placeholder="קוד חדש" value={code} onChange={(e) => setCode(e.target.value)} />
+        <input type="password" autoComplete="new-password" placeholder="שוב, לאימות" value={again} onChange={(e) => setAgain(e.target.value)} />
+        <button className="btn" disabled={busy || !code}>
+          החלפת קוד
+        </button>
+      </form>
+      {msg && <p className="error">{msg}</p>}
+
+      <hr />
+      <div className="profile-actions">
+        <button className="btn" onClick={onLock}>
+          🔒 נעילת ההגדרות
+        </button>
+        <button className="btn" onClick={() => switchAccount(null)}>
+          ⇄ החלפת משתמש
+        </button>
+        <button
+          className="btn"
+          onClick={() =>
+            confirm(`להסיר את ${account.name} מהמכשיר הזה? הנתונים נשמרים, ואפשר להיכנס שוב עם השם והקוד.`) &&
+            forgetAccount(account.id)
+          }
+        >
+          יציאה מהמכשיר
+        </button>
+      </div>
     </div>
   )
 }

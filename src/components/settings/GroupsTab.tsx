@@ -11,9 +11,9 @@ import {
   updateGroup,
 } from '../../lib/admin'
 import { playWord } from '../../lib/audio'
-import { useContent } from '../../lib/content'
+import { storageUrl, useContent } from '../../lib/content'
 import { activeGroup } from '../../lib/items'
-import { Group, Learner, getLearner, setCurrentGroup, storageUrl } from '../../lib/supabase'
+import { Group, Learner, getLearner, setCurrentGroup } from '../../lib/supabase'
 import { RecordButton } from '../ui/RecordButton'
 
 export function GroupsTab() {
@@ -57,7 +57,7 @@ export function GroupsTab() {
     <div className="panel">
       <p className="muted">
         כל קבוצה היא רשימה של הברות או מילים (2–3 הברות) עם ניקוד. המשחקים משתמשים בקבוצה הנוכחית ⭐,
-        לפי הסדר. אחרי סבב מוצלח (80% ומעלה) דובי יכול לעבור לקבוצה הבאה.
+        לפי הסדר. אחרי סבב מוצלח (80% ומעלה) אפשר לעבור לקבוצה הבאה.
       </p>
       {error && <p className="error">{error}</p>}
 

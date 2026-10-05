@@ -1034,3 +1034,113 @@ label {
   font-size: 2rem;
   text-decoration: none;
 }
+
+/* Who is reading */
+.welcome {
+  text-align: center;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.welcome h1 {
+  font-size: clamp(2.2rem, 9vw, 3.4rem);
+  font-weight: 800;
+  margin: 0;
+}
+.welcome h1 span {
+  color: var(--accent);
+}
+.welcome .nikud-row {
+  margin-bottom: 8px;
+}
+.who-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 14px;
+}
+.who {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 18px 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.who-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+.who-avatar.small {
+  width: 30px;
+  height: 30px;
+  font-size: 1rem;
+}
+.who-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+.welcome-links {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.account-form {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.account-form h3 {
+  margin: 0 0 8px;
+}
+.account-form .btn.primary {
+  margin-top: 8px;
+}
+.field-title {
+  font-weight: 600;
+  margin: 8px 0 4px;
+}
+.pron-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pron-sample {
+  direction: rtl;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+.home-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.home-top .settings-btn {
+  position: static;
+}
+.user-chip {
+  background: var(--card);
+  border-radius: 999px;
+  padding: 4px 12px 4px 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  box-shadow: 0 2px 0 rgba(43, 33, 64, 0.1);
+}
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

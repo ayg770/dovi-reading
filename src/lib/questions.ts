@@ -1,4 +1,4 @@
-import { LETTERS, Letter, NIKUD, SYLLABLE_LETTERS, Syllable, similarLetters } from '../data/hebrew'
+import { LETTERS, Letter, NIKUD, SYLLABLE_LETTERS, Syllable, nikudVowel, similarLetters } from '../data/hebrew'
 import type { Item } from './items'
 import type { ProgressRow } from './supabase'
 
@@ -68,7 +68,10 @@ export function makeQuestion(
   nikudIds: number[],
 ): Question {
   const answer = weightedAnswer(progress, recent, syllablesWith(nikudIds))
-  const otherNikuds = NIKUD.filter((n) => n.id !== answer.nikud.id && nikudIds.includes(n.id))
+  // Only nikud that sound different (in regular pronunciation kamatz and patach are both "a").
+  const otherNikuds = NIKUD.filter(
+    (n) => nikudIds.includes(n.id) && nikudVowel(n) !== nikudVowel(answer.nikud),
+  )
 
   if (!otherNikuds.length) {
     const first = otherLetterFor(answer, [answer.letter.id])

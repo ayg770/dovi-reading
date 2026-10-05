@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react'
 import { HearSyllableGame } from './components/games/HearSyllableGame'
 import { ReadAloudGame } from './components/games/ReadAloudGame'
 import { ContentPicker } from './components/ui/ContentPicker'
+import { setPronunciation } from './data/hebrew'
+import { currentAccount, switchAccount } from './lib/account'
 import { ensureContent, refreshContent } from './lib/content'
 import { Selection, saveSelection } from './lib/selection'
 import { GameId, Home } from './pages/Home'
 import { Settings } from './pages/Settings'
+import { Welcome } from './pages/Welcome'
+import { getLearner } from './lib/supabase'
 
 const TITLES: Record<GameId, { title: string; icon: string }> = {
   hear_syllable: { title: 'שמע ובחר', icon: '👂' },
@@ -21,10 +25,23 @@ type Screen =
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ kind: 'home' })
   const [run, setRun] = useState(0)
+  const account = currentAccount()
+  const [boot, setBoot] = useState<'loading' | 'ready' | 'invalid'>(account ? 'loading' : 'ready')
 
+  // Load the signed-in user: their pronunciation shapes how everything sounds.
   useEffect(() => {
-    void ensureContent()
-  }, [])
+    if (!account) return
+    void getLearner().then((learner) => {
+      if (!learner) return setBoot('invalid')
+      setPronunciation(learner.pronunciation)
+      void ensureContent()
+      setBoot('ready')
+    })
+  }, [account])
+
+  if (!account) return <Welcome />
+  if (boot === 'loading') return <div className="game loading">…</div>
+  if (boot === 'invalid') return <Welcome error={`לא הצלחנו להיכנס בתור ${account.name}. אולי הקוד הוחלף או שאין חיבור — נסו להיכנס שוב.`} />
 
   const home = () => setScreen({ kind: 'home' })
 
@@ -64,5 +81,12 @@ export default function App() {
     return screen.game === 'hear_syllable' ? <HearSyllableGame {...props} /> : <ReadAloudGame {...props} />
   }
 
-  return <Home onPlay={(game) => setScreen({ kind: 'pick', game })} onSettings={() => setScreen({ kind: 'settings' })} />
+  return (
+    <Home
+      userName={account.name}
+      onPlay={(game) => setScreen({ kind: 'pick', game })}
+      onSettings={() => setScreen({ kind: 'settings' })}
+      onSwitchUser={() => switchAccount(null)}
+    />
+  )
 }

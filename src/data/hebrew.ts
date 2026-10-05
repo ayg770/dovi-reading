@@ -16,8 +16,6 @@ export type Nikud = {
   key: 'patach' | 'hiriq' | 'kamatz'
   mark: string
   name: string
-  /** vowel sound in Ashkenazi pronunciation */
-  sound: 'a' | 'i' | 'o'
 }
 
 export const LETTERS: Letter[] = [
@@ -51,9 +49,9 @@ export const LETTERS: Letter[] = [
 ]
 
 export const NIKUD: Nikud[] = [
-  { id: 1, key: 'patach', mark: 'ַ', name: 'פתח', sound: 'a' },
-  { id: 2, key: 'hiriq', mark: 'ִ', name: 'חיריק', sound: 'i' },
-  { id: 3, key: 'kamatz', mark: 'ָ', name: 'קמץ', sound: 'o' },
+  { id: 1, key: 'patach', mark: 'ַ', name: 'פתח' },
+  { id: 2, key: 'hiriq', mark: 'ִ', name: 'חיריק' },
+  { id: 3, key: 'kamatz', mark: 'ָ', name: 'קמץ' },
 ]
 
 /** Letters that can open a syllable (no final forms). */
@@ -84,18 +82,32 @@ export function syllableKey({ letter, nikud }: Syllable): string {
 
 /**
  * Text handed to the Hebrew speech engine as a fallback when there is no recording.
- * Engines read a lone pointed letter unreliably, so we spell an open syllable with a
- * vowel letter, and spell kamatz with holam so it comes out as Ashkenazi "o".
+ * Engines read a lone pointed letter unreliably, so an open syllable is spelled with a
+ * vowel letter, and Ashkenazi sounds are spelled the way the engine will say them
+ * (kamatz as "o" = וֹ, holam as "oy" = וֹי, tsere as "ey" = ֵי).
  */
 export function syllableSpeechText({ letter, nikud }: Syllable): string {
-  const consonant = letter.dagesh ?? letter.glyph
-  switch (nikud.sound) {
+  return openSyllableSpeech(letter.dagesh ?? letter.glyph, nikudVowel(nikud))
+}
+
+function openSyllableSpeech(consonant: string, vowel: Vowel): string {
+  switch (vowel) {
     case 'a':
-      return consonant + 'ָ' + 'ה'
+      return consonant + '\u05B8' + 'ה'
     case 'i':
-      return consonant + 'ִ' + 'י'
+      return consonant + '\u05B4' + 'י'
     case 'o':
       return consonant + 'וֹ'
+    case 'oy':
+      return consonant + 'וֹי'
+    case 'e':
+      return consonant + '\u05B6' + 'ה'
+    case 'ey':
+      return consonant + '\u05B5' + 'י'
+    case 'u':
+      return consonant + 'וּ'
+    default:
+      return consonant
   }
 }
 
@@ -107,7 +119,23 @@ export function similarLetters(glyph: string): string[] {
 // ---------------------------------------------------------------------------
 // Words: parsing pointed text into syllables
 
-export type Vowel = 'a' | 'i' | 'o' | 'e' | 'u' | ''
+export type Vowel = 'a' | 'i' | 'o' | 'oy' | 'e' | 'ey' | 'u' | ''
+
+/**
+ * Ashkenazi: kamatz "o", holam "oy", tsere "ey". Sephardi ("regular", as in Israel):
+ * kamatz "a", holam "o", tsere "e". Each user picks one.
+ */
+export type Pronunciation = 'ashkenazi' | 'sephardi'
+
+let pronunciation: Pronunciation = 'ashkenazi'
+
+export function setPronunciation(p: Pronunciation) {
+  pronunciation = p
+}
+
+export function currentPronunciation(): Pronunciation {
+  return pronunciation
+}
 
 /** A syllable inside a word, as stored in words.syllables. */
 export type WordSyllable = {
@@ -116,7 +144,7 @@ export type WordSyllable = {
   letter_id: number | null
   /** set only for the nikud the app knows (patach/hiriq/kamatz) */
   nikud_id: number | null
-  /** Ashkenazi vowel sound */
+  /** vowel sound in the current user's pronunciation */
   vowel: Vowel
 }
 
@@ -127,19 +155,41 @@ const SHEVA = 'ְ'
 const HOLAM = 'ֹ'
 const HOLAM_HASER_VAV = 'ֺ'
 
-/** Ashkenazi sound of every vowel mark (sheva counts as no vowel). */
-const VOWEL_OF_MARK: Record<string, Vowel> = {
-  'ֱ': 'e', // hataf segol
-  'ֲ': 'a', // hataf patach
-  'ֳ': 'o', // hataf kamatz
-  'ִ': 'i', // hiriq
-  'ֵ': 'e', // tsere
-  'ֶ': 'e', // segol
-  'ַ': 'a', // patach
-  'ָ': 'o', // kamatz (Ashkenazi)
-  'ֹ': 'o', // holam
-  'ֺ': 'o',
-  'ֻ': 'u', // kubutz
+/** Sound of every vowel mark (sheva counts as no vowel). */
+const VOWEL_OF_MARK: Record<Pronunciation, Record<string, Vowel>> = {
+  ashkenazi: {
+    '\u05B1': 'e', // hataf segol
+    '\u05B2': 'a', // hataf patach
+    '\u05B3': 'o', // hataf kamatz
+    '\u05B4': 'i', // hiriq
+    '\u05B5': 'ey', // tsere
+    '\u05B6': 'e', // segol
+    '\u05B7': 'a', // patach
+    '\u05B8': 'o', // kamatz
+    '\u05B9': 'oy', // holam
+    '\u05BA': 'oy',
+    '\u05BB': 'u', // kubutz
+  },
+  sephardi: {
+    '\u05B1': 'e',
+    '\u05B2': 'a',
+    '\u05B3': 'o',
+    '\u05B4': 'i',
+    '\u05B5': 'e',
+    '\u05B6': 'e',
+    '\u05B7': 'a',
+    '\u05B8': 'a',
+    '\u05B9': 'o',
+    '\u05BA': 'o',
+    '\u05BB': 'u',
+  },
+}
+
+const markVowel = (mark: string): Vowel | undefined => VOWEL_OF_MARK[pronunciation][mark]
+
+/** How this nikud sounds for the current user. */
+export function nikudVowel(n: Nikud): Vowel {
+  return markVowel(n.mark) ?? ''
 }
 
 export const NIKUD_KEYBOARD: { mark: string; name: string }[] = [
@@ -171,7 +221,10 @@ function toUnits(text: string): Unit[] {
 }
 
 function vowelOf(u: Unit): Vowel {
-  for (const m of u.marks) if (VOWEL_OF_MARK[m]) return VOWEL_OF_MARK[m]
+  for (const m of u.marks) {
+    const v = markVowel(m)
+    if (v) return v
+  }
   return ''
 }
 
@@ -195,7 +248,7 @@ export function parseWord(text: string): WordSyllable[] {
       !prevUnit.marks.includes(SHEVA) &&
       prev.units[prev.units.length - 1] === prevUnit
     if (isVavVowel) {
-      const vowel: Vowel = u.marks === DAGESH ? 'u' : 'o'
+      const vowel: Vowel = u.marks === DAGESH ? 'u' : (markVowel(HOLAM) ?? 'o')
       if (prev.units.length === 1) {
         prev.vowel = vowel
         prev.units.push(u)
@@ -234,30 +287,42 @@ export function parseWord(text: string): WordSyllable[] {
   }))
 }
 
+/** All the syllables of a text that may hold several words. */
+export function parseText(text: string): WordSyllable[] {
+  return text.split(/\s+/).filter(Boolean).flatMap(parseWord)
+}
+
 export function stripNikud(text: string): string {
   return [...text.normalize('NFD')].filter((c) => !isMark(c)).join('')
 }
 
 export function hasNikud(text: string): boolean {
-  return [...text.normalize('NFD')].some((c) => VOWEL_OF_MARK[c] || c === SHEVA)
+  return [...text.normalize('NFD')].some((c) => markVowel(c) || c === SHEVA)
 }
 
 /**
- * Text for the Hebrew speech engine, adjusted to Ashkenazi pronunciation:
- * kamatz is spelled as holam, and ת without dagesh as ס.
+ * Text for the Hebrew speech engine. Regular (Sephardi) pronunciation is what the
+ * engine speaks anyway. For Ashkenazi, kamatz is spelled וֹ ("o"), holam וֹי ("oy"),
+ * tsere ֵי ("ey"), and ת without dagesh as ס.
  */
 export function wordSpeechText(text: string): string {
   const units = toUnits(text)
   if (units.length === 1) {
     const letter = LETTERS.find((l) => l.glyph === units[0].glyph)
-    const vowel = vowelOf(units[0])
-    const nikud = NIKUD.find((n) => n.sound === vowel)
-    if (letter && nikud) return syllableSpeechText({ letter, nikud })
+    if (letter) return openSyllableSpeech(units[0].glyph + (units[0].marks.includes(DAGESH) ? DAGESH : ''), vowelOf(units[0]))
   }
+  if (pronunciation === 'sephardi') return text
   return units
-    .map((u) => {
+    .map((u, i) => {
+      const prev = units[i - 1]
+      // holam male: the vav carries the "oy" of the letter before it
+      if (u.glyph === 'ו' && (u.marks === HOLAM || u.marks === HOLAM_HASER_VAV) && prev && vowelOf(prev) === '')
+        return 'וֹי'
       const glyph = u.glyph === 'ת' && !u.marks.includes(DAGESH) ? 'ס' : u.glyph
-      if (u.marks.includes('ָ')) return glyph + u.marks.replace('ָ', '') + 'וֹ'
+      const strip = (m: string) => u.marks.replace(m, '')
+      if (u.marks.includes('\u05B8')) return glyph + strip('\u05B8') + 'וֹ'
+      if (u.marks.includes(HOLAM)) return glyph + strip(HOLAM) + 'וֹי'
+      if (u.marks.includes('\u05B5')) return glyph + u.marks + 'י'
       return glyph + u.marks
     })
     .join('')

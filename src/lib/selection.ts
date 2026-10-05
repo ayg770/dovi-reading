@@ -1,9 +1,12 @@
+import { currentAccount } from './account'
+
 /** What a game plays: single syllables (with chosen nikud) or one word group. */
 export type Selection =
   | { kind: 'singles'; nikudIds: number[] }
   | { kind: 'group'; groupId: string }
 
-const storageKey = (game: string) => `dovi-selection-${game}`
+// Per user: two people on one device keep their own last choice.
+const storageKey = (game: string) => `dovi-selection-${currentAccount()?.id ?? 'none'}-${game}`
 
 /** The last choice made for this game on this device (a per-device convenience). */
 export function loadSelection(game: string): Selection | null {

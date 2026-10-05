@@ -1,11 +1,17 @@
 // Content edits from the settings page. Every write needs the parent code (checked by RLS).
-import { LETTERS, NIKUD, hasNikud, parseWord, stripNikud } from '../data/hebrew'
-import { getContent, refreshContent } from './content'
-import { Group, removeAudio, supabase, uploadAudio } from './supabase'
+import { LETTERS, NIKUD, currentPronunciation, hasNikud, parseText, stripNikud } from '../data/hebrew'
+import { getContent, ownRecording, refreshContent } from './content'
+import { Group, getLearnerId, removeAudio, supabase, uploadAudio } from './supabase'
 
 function db() {
   if (!supabase) throw new Error('אין חיבור לשרת')
   return supabase
+}
+
+async function me(): Promise<string> {
+  const id = await getLearnerId()
+  if (!id) throw new Error('אין משתמש מחובר')
+  return id
 }
 
 function check<T extends { error: { message: string } | null }>(res: T): T {
@@ -19,9 +25,7 @@ export async function saveSyllableRecording(letterId: number, nikudId: number, b
   const letter = LETTERS.find((l) => l.id === letterId)!
   const nikud = NIKUD.find((n) => n.id === nikudId)!
   const path = await uploadAudio('syllables', `${letter.key}_${nikud.key}`, blob)
-  const existing = getContent().recordings.find(
-    (r) => r.source === 'storage' && r.letter_id === letterId && r.nikud_id === nikudId,
-  )
+  const existing = ownRecording(letterId, nikudId)
   if (existing) {
     check(await db().from('recordings').update({ audio_path: path }).eq('id', existing.id))
     await removeAudio(existing.audio_path)
@@ -29,16 +33,21 @@ export async function saveSyllableRecording(letterId: number, nikudId: number, b
     check(
       await db()
         .from('recordings')
-        .insert({ letter_id: letterId, nikud_id: nikudId, audio_path: path, source: 'storage' }),
+        .insert({
+          user_id: await me(),
+          letter_id: letterId,
+          nikud_id: nikudId,
+          audio_path: path,
+          source: 'storage',
+          pronunciation: currentPronunciation(),
+        }),
     )
   }
   await refreshContent()
 }
 
 export async function deleteSyllableRecording(letterId: number, nikudId: number) {
-  const existing = getContent().recordings.find(
-    (r) => r.source === 'storage' && r.letter_id === letterId && r.nikud_id === nikudId,
-  )
+  const existing = ownRecording(letterId, nikudId)
   if (!existing) return
   check(await db().from('recordings').delete().eq('id', existing.id))
   await removeAudio(existing.audio_path)
@@ -58,7 +67,7 @@ export function splitLines(text: string): string[] {
 export type LineCheck = { text: string; preview: string; warning: string | null }
 
 export function checkLine(text: string): LineCheck {
-  const syllables = text.split(' ').flatMap(parseWord)
+  const syllables = parseText(text)
   let warning: string | null = null
   if (!syllables.length) warning = 'אין אותיות עבריות'
   else if (!hasNikud(text)) warning = 'בלי ניקוד'
@@ -66,31 +75,34 @@ export function checkLine(text: string): LineCheck {
   return { text, preview: syllables.map((s) => s.text).join('·'), warning }
 }
 
-function wordRow(groupId: string, text: string, sortOrder: number) {
+function wordRow(userId: string, groupId: string, text: string, sortOrder: number) {
   return {
+    user_id: userId,
     group_id: groupId,
     text,
     plain_text: stripNikud(text),
-    syllables: text.split(' ').flatMap(parseWord),
-    difficulty: Math.min(3, Math.max(1, text.split(' ').flatMap(parseWord).length)),
+    syllables: parseText(text),
+    difficulty: Math.min(3, Math.max(1, parseText(text).length)),
     sort_order: sortOrder,
   }
 }
 
 export async function createGroup(name: string, lines: string[]) {
+  const owner = await me()
   const groups = getContent().groups
   const sortOrder = groups.length ? Math.max(...groups.map((g) => g.sort_order)) + 1 : 1
   const { data } = check(
-    await db().from('word_groups').insert({ name, sort_order: sortOrder }).select('id').single(),
+    await db().from('word_groups').insert({ name, sort_order: sortOrder, user_id: owner }).select('id').single(),
   )
   const unique = [...new Set(lines)]
   if (unique.length)
-    check(await db().from('words').insert(unique.map((t, i) => wordRow(data!.id, t, i + 1))))
+    check(await db().from('words').insert(unique.map((t, i) => wordRow(owner, data!.id, t, i + 1))))
   await refreshContent()
 }
 
 /** Rename and set the words; words that stay keep their recordings. */
 export async function updateGroup(group: Group, name: string, lines: string[]) {
+  const owner = await me()
   const unique = [...new Set(lines)]
   if (name !== group.name) check(await db().from('word_groups').update({ name }).eq('id', group.id))
 
@@ -102,7 +114,7 @@ export async function updateGroup(group: Group, name: string, lines: string[]) {
   const added = unique
     .map((t, i) => ({ t, i }))
     .filter(({ t }) => !group.words.some((w) => w.text === t))
-  if (added.length) check(await db().from('words').insert(added.map(({ t, i }) => wordRow(group.id, t, i + 1))))
+  if (added.length) check(await db().from('words').insert(added.map(({ t, i }) => wordRow(owner, group.id, t, i + 1))))
   for (const w of group.words) {
     const i = unique.indexOf(w.text)
     if (i >= 0 && w.sort_order !== i + 1)
@@ -144,7 +156,7 @@ export async function deleteWordRecording(wordId: string, path: string | null) {
 
 export async function addPraiseClip(blob: Blob) {
   const path = await uploadAudio('praise', 'praise', blob)
-  check(await db().from('praise_clips').insert({ audio_path: path }))
+  check(await db().from('praise_clips').insert({ audio_path: path, user_id: await me() }))
   await refreshContent()
 }
 

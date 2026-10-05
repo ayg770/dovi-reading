@@ -123,8 +123,12 @@ function vowelSpellings(vowel: WordSyllable['vowel'], isLast: boolean): string[]
       return ['י', '']
     case 'o':
       return isLast ? ['ו', 'וא', 'ה'] : ['ו']
+    case 'oy':
+      return ['וי', 'ויי', 'ו']
     case 'u':
       return ['ו']
+    case 'ey':
+      return isLast ? ['יי', 'י', 'אי', 'ה'] : ['יי', 'י', '']
     case 'e':
       return isLast ? ['ה', 'י', ''] : ['', 'י']
     default:
@@ -156,7 +160,7 @@ export function expectedSpellings(syllables: WordSyllable[]): string[] {
     const isLastSyllable = si === syllables.length - 1
     units.forEach((u, ui) => {
       // A vav that carries the vowel (וֹ / וּ) is spelled by the vowel itself.
-      if (ui === 1 && u.glyph === 'ו' && (s.vowel === 'o' || s.vowel === 'u')) return
+      if (ui === 1 && u.glyph === 'ו' && (s.vowel === 'o' || s.vowel === 'oy' || s.vowel === 'u')) return
       parts.push(consonantSpellings(u.glyph, u.marks))
       if (ui === 0) parts.push(vowelSpellings(s.vowel, isLastSyllable && units.length === 1))
     })

@@ -1,112 +1,114 @@
 import { SupabaseClient, createClient } from '@supabase/supabase-js'
-import type { WordSyllable } from '../data/hebrew'
+import type { Pronunciation, WordSyllable } from '../data/hebrew'
+import { Account, currentAccount } from './account'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
-
-const PARENT_CODE_KEY = 'dovi-parent-code'
 
 /** Headers must be Latin-1, and the code may be Hebrew: send it as base64 of its UTF-8 bytes. */
 function encodeHeader(code: string): string {
   return btoa(String.fromCharCode(...new TextEncoder().encode(code)))
 }
 
-function makeClient(parentCode?: string | null): SupabaseClient | null {
+function makeClient(account: Account | null): SupabaseClient | null {
   if (!url || !key) return null
   return createClient(url, key, {
-    // No login: skip the auth machinery (and the warning about several auth clients).
-    auth: { persistSession: false, autoRefreshToken: false, storageKey: parentCode ? 'dovi-parent' : 'dovi' },
-    global: parentCode ? { headers: { 'x-parent-code': encodeHeader(parentCode) } } : undefined,
+    // No Supabase Auth: the user is identified by the two headers below.
+    auth: { persistSession: false, autoRefreshToken: false, storageKey: 'dovi' },
+    global: account
+      ? { headers: { 'x-user-id': account.id, 'x-user-code': encodeHeader(account.code) } }
+      : undefined,
   })
 }
 
-function storedParentCode(): string | null {
-  try {
-    return sessionStorage.getItem(PARENT_CODE_KEY)
-  } catch {
-    return null
-  }
-}
-
 /**
- * The client in use. After the parent enters their code it carries the code in the
- * x-parent-code header, which the database checks before allowing content edits.
- * null when env vars are missing — the games still work, they just don't save.
+ * The client in use. It carries the current user's id and code, which the database
+ * checks (current_user_id()) before showing or changing any of that user's rows.
+ * null when env vars are missing.
  */
-export let supabase: SupabaseClient | null = makeClient(storedParentCode())
+export const supabase: SupabaseClient | null = makeClient(currentAccount())
 
-export function isParentUnlocked(): boolean {
-  return !!storedParentCode()
+// ---------------------------------------------------------------------------
+// Accounts
+
+const ERRORS: Record<string, string> = {
+  'name taken': 'השם הזה כבר תפוס, נסו שם אחר',
+  'name must be 1-40 characters': 'צריך שם (עד 40 תווים)',
+  'code must be at least 4 characters': 'הקוד צריך להיות לפחות 4 תווים',
 }
 
-export async function parentCodeExists(): Promise<boolean> {
-  if (!supabase) return false
-  const { data } = await supabase.rpc('parent_pin_exists')
-  return !!data
+function message(error: { message: string }): string {
+  return ERRORS[error.message] ?? error.message
 }
 
-/** Checks the code, and if right, switches to a client that sends it. */
-export async function unlockParent(code: string): Promise<boolean> {
-  if (!supabase) return false
-  const { data } = await supabase.rpc('check_parent_pin', { pin: code })
-  if (!data) return false
-  try {
-    sessionStorage.setItem(PARENT_CODE_KEY, code)
-  } catch {
-    // private mode: stays unlocked until reload
-  }
-  supabase = makeClient(code)
-  return true
+/** Create a user; returns their id, or throws a message to show. */
+export async function createUser(name: string, code: string, pronunciation: Pronunciation): Promise<string> {
+  if (!supabase) throw new Error('אין חיבור לשרת')
+  const { data, error } = await supabase.rpc('create_user', {
+    p_name: name,
+    p_code: code,
+    p_pronunciation: pronunciation,
+  })
+  if (error) throw new Error(message(error))
+  return data as string
 }
 
-/** First-time setup, or change (then the current code must already be unlocked). */
-export async function setParentCode(code: string): Promise<string | null> {
-  if (!supabase) return 'אין חיבור לשרת'
-  const { error } = await supabase.rpc('set_parent_pin', { new_pin: code })
-  if (error) return error.message
-  await unlockParent(code)
-  return null
+/** The user's id if the name and code match, else null. */
+export async function loginUser(name: string, code: string): Promise<string | null> {
+  if (!supabase) throw new Error('אין חיבור לשרת')
+  const { data, error } = await supabase.rpc('login_user', { p_name: name, p_code: code })
+  if (error) throw new Error(message(error))
+  return (data as string | null) ?? null
 }
 
-export function lockParent() {
-  try {
-    sessionStorage.removeItem(PARENT_CODE_KEY)
-  } catch {
-    // ignore
-  }
-  supabase = makeClient(null)
+export async function changeCode(newCode: string): Promise<void> {
+  if (!supabase) throw new Error('אין חיבור לשרת')
+  const { error } = await supabase.rpc('change_code', { p_new_code: newCode })
+  if (error) throw new Error(message(error))
 }
 
 // ---------------------------------------------------------------------------
-// Learner
+// The current user
 
-export const LEARNER_NAME = 'דובי'
-
-export type Learner = { id: string; current_group_id: string | null; stars: number }
+export type Learner = {
+  id: string
+  name: string
+  pronunciation: Pronunciation
+  current_group_id: string | null
+  stars: number
+}
 
 let learnerPromise: Promise<Learner | null> | null = null
 
 export function getLearner(): Promise<Learner | null> {
   learnerPromise ??= (async () => {
-    if (!supabase) return null
+    const account = currentAccount()
+    if (!supabase || !account) return null
     const { data, error } = await supabase
       .from('users')
-      .select('id, current_group_id, stars')
-      .eq('name', LEARNER_NAME)
-      .limit(1)
+      .select('id, name, pronunciation, current_group_id, stars')
+      .eq('id', account.id)
       .maybeSingle()
-    if (error) console.warn('supabase: could not load learner', error)
+    if (error) console.warn('supabase: could not load user', error)
     return data ?? null
   })()
   return learnerPromise
 }
 
 export async function getLearnerId(): Promise<string | null> {
-  return (await getLearner())?.id ?? null
+  return currentAccount()?.id ?? null
 }
 
 function forgetLearner() {
   learnerPromise = null
+}
+
+export async function updateProfile(fields: { name?: string; pronunciation?: Pronunciation }) {
+  const userId = await getLearnerId()
+  if (!supabase || !userId) throw new Error('אין חיבור לשרת')
+  const { error } = await supabase.from('users').update(fields).eq('id', userId)
+  forgetLearner()
+  if (error) throw new Error(error.message.includes('users_name_key') ? ERRORS['name taken'] : error.message)
 }
 
 export type ProgressRow = { letter_id: number; nikud_id: number; attempts: number; correct: number }
@@ -231,6 +233,7 @@ export type Recording = {
   nikud_id: number | null
   audio_path: string
   source: 'static' | 'storage'
+  pronunciation: Pronunciation
 }
 
 export type PraiseClip = { id: string; audio_path: string }
@@ -250,7 +253,7 @@ export async function loadContent(): Promise<Content> {
       .from('words')
       .select('id, group_id, text, plain_text, syllables, audio_path, sort_order')
       .order('sort_order'),
-    supabase.from('recordings').select('id, letter_id, nikud_id, audio_path, source'),
+    supabase.from('recordings').select('id, letter_id, nikud_id, audio_path, source, pronunciation'),
     supabase.from('praise_clips').select('id, audio_path').order('created_at'),
   ])
   for (const r of [groups, words, recordings, praise])
@@ -267,9 +270,16 @@ export async function loadContent(): Promise<Content> {
 
 export const AUDIO_BUCKET = 'audio'
 
-export function storageUrl(path: string): string {
-  if (!supabase) return ''
-  return supabase.storage.from(AUDIO_BUCKET).getPublicUrl(path).data.publicUrl
+/** Temporary links for private recordings, valid for `hours`. */
+export async function signAudio(paths: string[], hours = 12): Promise<Record<string, string>> {
+  if (!supabase || !paths.length) return {}
+  const { data, error } = await supabase.storage
+    .from(AUDIO_BUCKET)
+    .createSignedUrls(paths, hours * 3600)
+  if (error) console.warn('supabase: could not sign recordings', error)
+  const out: Record<string, string> = {}
+  for (const d of data ?? []) if (d.path && d.signedUrl) out[d.path] = d.signedUrl
+  return out
 }
 
 function extensionFor(type: string): string {
@@ -284,7 +294,10 @@ function extensionFor(type: string): string {
 export async function uploadAudio(folder: string, name: string, blob: Blob): Promise<string> {
   if (!supabase) throw new Error('אין חיבור לשרת')
   const type = blob.type.split(';')[0] || 'audio/webm'
-  const path = `${folder}/${name}-${Date.now()}.${extensionFor(type)}`
+  const userId = await getLearnerId()
+  if (!userId) throw new Error('אין משתמש מחובר')
+  // Each user's files live under their own id; the storage policy checks it.
+  const path = `${userId}/${folder}/${name}-${Date.now()}.${extensionFor(type)}`
   const { error } = await supabase.storage
     .from(AUDIO_BUCKET)
     .upload(path, blob, { contentType: type, upsert: true })

@@ -1,18 +1,16 @@
 import { Fragment } from 'react'
-import { NIKUD, SYLLABLE_LETTERS, syllableText } from '../../data/hebrew'
+import { NIKUD, SYLLABLE_LETTERS, currentPronunciation, syllableText } from '../../data/hebrew'
 import { deleteSyllableRecording, saveSyllableRecording } from '../../lib/admin'
-import { useContent } from '../../lib/content'
-import { storageUrl } from '../../lib/supabase'
+import { ownRecording, storageUrl, useContent } from '../../lib/content'
 import { RecordButton } from '../ui/RecordButton'
 
 /** A grid of every letter × nikud; tap to record Dovi (or anyone) saying it. */
 export function SyllablesTab() {
   const content = useContent()
-  const recorded = (letterId: number, nikudId: number) =>
-    content.recordings.find(
-      (r) => r.source === 'storage' && r.letter_id === letterId && r.nikud_id === nikudId,
-    )
-  const count = content.recordings.filter((r) => r.source === 'storage').length
+  // content is read so the grid re-renders when recordings change
+  const recorded = (letterId: number, nikudId: number) => (content ? ownRecording(letterId, nikudId) : undefined)
+  const pron = currentPronunciation()
+  const count = content.recordings.filter((r) => r.source === 'storage' && r.pronunciation === pron).length
 
   return (
     <div className="panel">
