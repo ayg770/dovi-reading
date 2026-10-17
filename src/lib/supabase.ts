@@ -264,7 +264,15 @@ export type Word = {
   sort_order: number
 }
 
-export type Group = { id: string; name: string; sort_order: number; kind: 'words' | 'text'; words: Word[] }
+export type Group = {
+  id: string
+  name: string
+  sort_order: number
+  kind: 'words' | 'text'
+  /** set when the group was added from the shared library */
+  library_id?: string | null
+  words: Word[]
+}
 
 export type Recording = {
   id: string
@@ -292,7 +300,7 @@ export async function loadContent(): Promise<Content> {
   const empty: Content = { groups: [], texts: [], recordings: [], praise: [] }
   if (!supabase) return empty
   const [groups, words, recordings, praise] = await Promise.all([
-    supabase.from('word_groups').select('id, name, sort_order, kind').order('sort_order'),
+    supabase.from('word_groups').select('id, name, sort_order, kind, library_id').order('sort_order'),
     supabase
       .from('words')
       .select('id, group_id, text, plain_text, syllables, audio_path, sort_order')
@@ -361,4 +369,52 @@ export async function removeAudio(path: string | null | undefined) {
   if (!supabase || !path) return
   const { error } = await supabase.storage.from(AUDIO_BUCKET).remove([path])
   if (error) console.warn('supabase: could not remove file', error)
+}
+
+// ---------------------------------------------------------------------------
+// The shared library of texts and word lists
+
+export type LibraryGroup = {
+  id: string
+  name: string
+  kind: 'words' | 'text'
+  category: string
+  sort_order: number
+  author: string | null
+  source_group_id: string | null
+  words: { text: string; sort_order: number }[]
+}
+
+export async function loadLibrary(): Promise<LibraryGroup[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('library_groups')
+    .select('id, name, kind, category, sort_order, author, source_group_id, library_words(text, sort_order)')
+    .eq('hidden', false)
+    .order('sort_order')
+  if (error) console.warn('supabase: could not load the library', error)
+  return (data ?? []).map((g) => {
+    const { library_words, ...rest } = g as typeof g & { library_words: LibraryGroup['words'] }
+    return { ...rest, words: [...(library_words ?? [])].sort((a, b) => a.sort_order - b.sort_order) } as LibraryGroup
+  })
+}
+
+/** Copy a library item into my own groups (the copy I already have, if any); returns its id. */
+export async function addLibraryGroup(libraryId: string): Promise<string> {
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
+  const { data, error } = await supabase.rpc('add_library_group', { p_lib: libraryId })
+  if (error) throw new Error(error.message)
+  return data as string
+}
+
+export async function publishGroup(groupId: string, category: string): Promise<void> {
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
+  const { error } = await supabase.rpc('publish_group', { p_group: groupId, p_category: category })
+  if (error) throw new Error(error.message)
+}
+
+export async function unpublishGroup(groupId: string): Promise<void> {
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
+  const { error } = await supabase.rpc('unpublish_group', { p_group: groupId })
+  if (error) throw new Error(error.message)
 }

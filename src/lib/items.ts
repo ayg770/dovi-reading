@@ -6,6 +6,7 @@ import {
   asOpenSyllable,
   nikudVowel,
   parseText,
+  stripMarkers,
   syllableText,
 } from '../data/hebrew'
 import { findGroup } from './content'
@@ -39,7 +40,7 @@ export function groupItems(group: Group): Item[] {
     key: w.id,
     text: w.text,
     // From the text, in this user's pronunciation (the stored copy may be another's).
-    syllables: parseText(w.text),
+    syllables: parseText(stripMarkers(w.text)),
     audio_path: w.audio_path,
   }))
 }

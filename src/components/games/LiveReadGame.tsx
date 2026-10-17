@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { parseWord } from '../../data/hebrew'
+import { isVerseMarker, parseWord } from '../../data/hebrew'
 import { playGradual, playItem, sfx, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
 import { Item, groupItems, randomSyllableItems } from '../../lib/items'
 import { LiveMatcher, ReadUnit, WordState } from '../../lib/liveReader'
 import { Selection, roundsOf, windowItems } from '../../lib/selection'
 import { Stream, canRecognize, streamListen } from '../../lib/speech'
+import { tokensOf, wordsOf } from '../../lib/texts'
 import { earnStar } from '../../lib/stars'
 import { finishSession, recordAnswer, saveSessionDetails, startSession } from '../../lib/supabase'
 import { t } from '../../lib/i18n'
@@ -25,13 +26,12 @@ const GAME_TYPE = 'read_aloud'
 /** Pause after a finished line before the next one shows. */
 const NEXT_DELAY_MS = 900
 
-const unitsOf = (item: Item): ReadUnit[] =>
-  /\s/.test(item.text.trim())
-    ? item.text
-        .split(/\s+/)
-        .filter(Boolean)
-        .map((w) => ({ text: w, syllables: parseWord(w) }))
-    : [{ text: item.text, syllables: item.syllables }]
+const unitsOf = (item: Item): ReadUnit[] => {
+  const words = wordsOf(item.text)
+  return words.length > 1
+    ? words.map((w) => ({ text: w, syllables: parseWord(w) }))
+    : [{ text: words[0] ?? item.text, syllables: item.syllables }]
+}
 
 /**
  * Reading aloud with the microphone open: every syllable or word that is said right turns green
@@ -222,24 +222,35 @@ export function LiveReadGame({ selection, onExit, onRestart, onPlayGroup }: Prop
 
       <div className={`read-card live${flash ? ' flash' : ''}`} dir="rtl">
         <span className={sentence ? 'read-text sentence' : 'read-text'}>
-          {units.map((u, wi) => {
-            const state = states[wi] ?? 'wait'
-            const isCur = wi === cur && state === 'wait'
-            return (
-              <span key={wi} className={`lw ${state}${isCur ? ' cur' : ''}`}>
-                {u.syllables.length > 1 || !u.syllables.length
-                  ? u.syllables.map((s, si) => (
-                      <span
-                        key={si}
-                        className={`ls${state === 'ok' || (isCur && si < syl) ? ' ok' : ''}${lit === si && isCur ? ' on' : ''}`}
-                      >
-                        {s.text}
-                      </span>
-                    ))
-                  : u.text}
-              </span>
-            )
-          })}
+          {(() => {
+            let wi = -1
+            return tokensOf(item.text).map((tok, ti) => {
+              if (isVerseMarker(tok))
+                return (
+                  <sup key={ti} className="vnum">
+                    {tok.slice(1, -1)}
+                  </sup>
+                )
+              wi++
+              const u = units[Math.min(wi, units.length - 1)]
+              const state = states[wi] ?? 'wait'
+              const isCur = wi === cur && state === 'wait'
+              return (
+                <span key={ti} className={`lw ${state}${isCur ? ' cur' : ''}`}>
+                  {u.syllables.length > 1 || !u.syllables.length
+                    ? u.syllables.map((sy, si) => (
+                        <span
+                          key={si}
+                          className={`ls${state === 'ok' || (isCur && si < syl) ? ' ok' : ''}${lit === si && isCur ? ' on' : ''}`}
+                        >
+                          {sy.text}
+                        </span>
+                      ))
+                    : u.text}
+                </span>
+              )
+            })
+          })()}
         </span>
       </div>
 

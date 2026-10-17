@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { NIKUD_KEYBOARD } from '../../data/hebrew'
+import { NIKUD_KEYBOARD, parseText } from '../../data/hebrew'
 import {
   checkLine,
   createGroup,
@@ -18,6 +18,7 @@ import { activeGroup } from '../../lib/items'
 import { Group, Learner, getLearner, setCurrentGroup } from '../../lib/supabase'
 import { RecordButton } from '../ui/RecordButton'
 import { t } from '../../lib/i18n'
+import { LibrarySection, usePublished } from './LibrarySection'
 
 export function GroupsTab() {
   const content = useContent()
@@ -25,6 +26,7 @@ export function GroupsTab() {
   const [editing, setEditing] = useState<Group | 'new' | null>(null)
   const [open, setOpen] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { published, toggle } = usePublished()
 
   useEffect(() => {
     void getLearner().then(setLearner)
@@ -102,6 +104,13 @@ export function GroupsTab() {
                 >
                   ✂️
                 </button>
+                <button
+                  className={published.has(g.id) ? 'rec-btn on' : 'rec-btn'}
+                  onClick={() => void run(() => toggle(g.id, 'words'))}
+                  title={published.has(g.id) ? t('פורסם בספרייה — לחצו כדי להסיר') : t('פרסום בספרייה, כדי שאחרים יוכלו להוסיף')}
+                >
+                  {published.has(g.id) ? '🌐' : '🔒'}
+                </button>
                 <button className="rec-btn" onClick={() => setEditing(g)} title={t('עריכה')}>
                   ✏️
                 </button>
@@ -134,7 +143,7 @@ export function GroupsTab() {
                     <button className="word-text" onClick={() => void playWord(w)} title={t('השמע')}>
                       {w.text}
                     </button>
-                    <span className="muted">{w.syllables.map((s) => s.text).join('·')}</span>
+                    <span className="muted">{parseText(w.text).map((s) => s.text).join('·')}</span>
                     <RecordButton
                       existingUrl={w.audio_path ? storageUrl(w.audio_path) : null}
                       onSave={(b) => saveWordRecording(w.id, w.audio_path, b)}
@@ -152,6 +161,7 @@ export function GroupsTab() {
       <button className="btn primary" onClick={() => setEditing('new')}>
         {t('+ קבוצה חדשה')}
       </button>
+      <LibrarySection kind="words" />
     </div>
   )
 }

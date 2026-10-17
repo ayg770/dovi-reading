@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { parseText } from '../../data/hebrew'
+import { isVerseMarker, parseText, wordSpeechText } from '../../data/hebrew'
 import { speak, stopAudio } from '../../lib/audio'
 import { ensureContent } from '../../lib/content'
-import { wordsOf } from '../../lib/texts'
+import { tokensOf, wordsOf } from '../../lib/texts'
 import { t } from '../../lib/i18n'
 import { finishSession, startSession } from '../../lib/supabase'
 import { FinishScreen } from '../ui/FinishScreen'
@@ -90,11 +90,23 @@ export function TextAutoGame({ groupId, pace: startPace, onExit, onRestart }: Pr
       <p className="group-tag">{name}</p>
 
       <div className="text-card" dir="rtl">
-        {words.map((w, i) => (
-          <span key={i} className={i === word ? 'tword on' : i < word ? 'tword past' : 'tword'}>
-            {w}
-          </span>
-        ))}
+        {(() => {
+          let wi = -1
+          return tokensOf(lines[line] ?? '').map((tok, ti) => {
+            if (isVerseMarker(tok))
+              return (
+                <sup key={ti} className="vnum">
+                  {tok.slice(1, -1)}
+                </sup>
+              )
+            wi++
+            return (
+              <span key={ti} className={wi === word ? 'tword on' : wi < word ? 'tword past' : 'tword'}>
+                {tok}
+              </span>
+            )
+          })
+        })()}
       </div>
 
       <div className="finish-actions">
@@ -111,7 +123,7 @@ export function TextAutoGame({ groupId, pace: startPace, onExit, onRestart }: Pr
           className="btn icon-btn"
           onClick={() => {
             setPlaying(false)
-            void speak(lines[line], 0.8)
+            void speak(wordSpeechText(lines[line]), 0.8)
           }}
           aria-label={t('שמע')}
         >

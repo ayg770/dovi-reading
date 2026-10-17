@@ -267,6 +267,8 @@ export function heardMatches(heard: string[], syllables: WordSyllable[]): boolea
   // ("שלום" for sholom), so the word's own spelling without nikud counts too.
   const plain = normalize(syllables.map((s) => s.text).join(''))
   const targets = [...expectedSpellings(syllables), plain]
+  // The divine name is written יי and said "Adonai" (or "HaShem", "A-do-nai" …).
+  if (plain === 'יי') targets.push('אדוני', 'אדני', 'השם', 'יהוה', 'ה')
   for (const alt of heard) {
     const candidates = [normalize(alt), ...alt.split(/\s+/).map(normalize)].filter(Boolean)
     for (const c of candidates)

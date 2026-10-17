@@ -5,6 +5,7 @@ import { useContent } from '../../lib/content'
 import { t } from '../../lib/i18n'
 import type { Group } from '../../lib/supabase'
 import { splitSegments, uniqueWords, wordsOf } from '../../lib/texts'
+import { LibrarySection, usePublished } from './LibrarySection'
 
 /** Your own texts (a prayer, a page of a book) to practice reading, cut into short lines. */
 export function TextsTab() {
@@ -12,6 +13,7 @@ export function TextsTab() {
   const [editing, setEditing] = useState<Group | 'new' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const { published, toggle } = usePublished()
 
   const run = async (fn: () => Promise<unknown>) => {
     setError(null)
@@ -59,6 +61,14 @@ export function TextsTab() {
                   🔤
                 </button>
                 <button
+                  className={published.has(g.id) ? 'rec-btn on' : 'rec-btn'}
+                  disabled={busy}
+                  title={published.has(g.id) ? t('פורסם בספרייה — לחצו כדי להסיר') : t('פרסום בספרייה, כדי שאחרים יוכלו להוסיף')}
+                  onClick={() => void run(() => toggle(g.id, 'texts'))}
+                >
+                  {published.has(g.id) ? '🌐' : '🔒'}
+                </button>
+                <button
                   className="rec-btn"
                   disabled={busy}
                   title={t('מחיקה')}
@@ -75,6 +85,7 @@ export function TextsTab() {
       <button className="btn primary" onClick={() => setEditing('new')}>
         {t('+ טקסט חדש')}
       </button>
+      <LibrarySection kind="text" />
     </div>
   )
 }
@@ -116,6 +127,7 @@ function TextEditor({ text, onDone }: { text: Group | null; onDone: () => void }
         {t('הטקסט (עם ניקוד)')}
         <textarea dir="rtl" rows={10} value={body} onChange={(e) => setBody(e.target.value)} />
       </label>
+      <p className="muted">{t('מספר פסוק בסוגריים מרובעים, למשל [א], מוצג קטן ולא נקרא ולא נספר.')}</p>
       <label>
         {t('עד כמה מילים בשורה?')}
         <select value={maxWords} onChange={(e) => setMaxWords(Number(e.target.value))}>

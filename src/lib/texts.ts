@@ -1,8 +1,13 @@
-import { stripNikud } from '../data/hebrew'
+import { isVerseMarker, stripNikud } from '../data/hebrew'
 
-/** Words of a text, as written (punctuation stays attached). */
-export function wordsOf(text: string): string[] {
+/** Everything written in a text, verse numbers like [א] included. */
+export function tokensOf(text: string): string[] {
   return text.split(/\s+/).filter(Boolean)
+}
+
+/** Words of a text, as written (punctuation stays attached). Verse numbers are not words. */
+export function wordsOf(text: string): string[] {
+  return tokensOf(text).filter((w) => !isVerseMarker(w))
 }
 
 const END = /[.!?:;׃]$/
@@ -20,10 +25,13 @@ export function splitSegments(text: string, maxWords = 10): string[] {
       if (current.length) out.push(current.join(' '))
       current = []
     }
-    for (const word of wordsOf(line)) {
+    let count = 0
+    for (const word of tokensOf(line)) {
       current.push(word)
-      if (END.test(stripNikud(word))) flush()
-      else if (current.length >= maxWords || (current.length >= Math.ceil(maxWords / 2) && SOFT.test(word))) flush()
+      if (isVerseMarker(word)) continue // carried along, never counted
+      count++
+      if (END.test(stripNikud(word))) flush(), (count = 0)
+      else if (count >= maxWords || (count >= Math.ceil(maxWords / 2) && SOFT.test(word))) flush(), (count = 0)
     }
     flush()
   }

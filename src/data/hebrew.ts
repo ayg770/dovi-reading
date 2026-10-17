@@ -324,6 +324,30 @@ export function parseText(text: string): WordSyllable[] {
   return text.split(/\s+/).filter(Boolean).flatMap(parseWord)
 }
 
+/** A verse number written [א] inside a text: shown, but never read and never counted. */
+export const isVerseMarker = (token: string) => /^\[[^\]\s]{1,6}\]$/.test(token)
+
+export function stripMarkers(text: string): string {
+  return text
+    .split(/\s+/)
+    .filter((w) => w && !isVerseMarker(w))
+    .join(' ')
+}
+
+/**
+ * The divine name as texts write it (יְיָ, also after a prefix letter: בַּיְיָ). Returns
+ * how it is said (אֲדֹנָי, with the prefix kept), or null for any other word.
+ */
+export function divineSpeech(word: string): string | null {
+  const plain = stripNikud(word).replace(/[^א-ת]/g, '')
+  if (plain === 'יי') return 'אֲדֹנָי'
+  if (plain.length === 3 && plain.endsWith('יי') && 'בלמוכה'.includes(plain[0])) {
+    const prefix = word.match(/^[א-ת][\u05B0-\u05BC]*/)?.[0]
+    return prefix ? prefix + 'אֲדֹנָי' : null
+  }
+  return null
+}
+
 export function stripNikud(text: string): string {
   return [...text.normalize('NFD')].filter((c) => !isMark(c)).join('')
 }
@@ -337,7 +361,12 @@ export function hasNikud(text: string): boolean {
  * engine speaks anyway. For Ashkenazi, kamatz is spelled וֹ ("o"), holam וֹי ("oy"),
  * tsere ֵי ("ey"), and ת without dagesh as ס.
  */
-export function wordSpeechText(text: string): string {
+export function wordSpeechText(rawText: string): string {
+  // Verse numbers are not read; the divine name (written יְיָ) is said "Adonai".
+  const text = stripMarkers(rawText)
+    .split(/\s+/)
+    .map((w) => divineSpeech(w) ?? w)
+    .join(' ')
   const units = toUnits(text)
   if (units.length === 1) {
     const letter = LETTERS.find((l) => l.glyph === units[0].glyph)

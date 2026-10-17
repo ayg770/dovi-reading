@@ -1799,3 +1799,22 @@ select {
   background: #e6f8ee;
   border: 3px solid var(--right);
 }
+
+/* verse numbers: shown small, never read */
+.vnum {
+  font-family: 'Rubik', system-ui, sans-serif;
+  font-size: 0.32em;
+  font-weight: 600;
+  color: var(--muted);
+  align-self: flex-start;
+  margin: 0 4px;
+  vertical-align: super;
+}
+
+.rec-btn.on {
+  background: #e6f8ee;
+  border-color: var(--right);
+}
+.library h4 {
+  margin: 10px 0 4px;
+}
