@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useContent } from '../lib/content'
 import { activeGroup } from '../lib/items'
-import { Learner, getLearner } from '../lib/supabase'
+import { Learner, getLearner, loadUnitProgress } from '../lib/supabase'
+import type { Unit } from '../data/curriculum'
+import { nextUnit, unitTitle } from '../lib/plan'
 import { JourneyMap } from '../components/ui/JourneyMap'
 import { AnimalCollection, StarBar } from '../components/ui/StarBar'
 import { t } from '../lib/i18n'
@@ -33,16 +35,22 @@ type Props = {
   userName: string
   onPlay: (id: GameId) => void
   onSettings: () => void
+  onPlan: () => void
+  onLesson: (u: Unit) => void
   onSwitchUser: () => void
 }
 
-export function Home({ userName, onPlay, onSettings, onSwitchUser }: Props) {
+export function Home({ userName, onPlay, onSettings, onPlan, onLesson, onSwitchUser }: Props) {
   const content = useContent()
   const [learner, setLearner] = useState<Learner | null>(null)
   useEffect(() => {
     void getLearner().then(setLearner)
   }, [content])
   const group = activeGroup(content, learner)
+  const [next, setNext] = useState<Unit | null>(null)
+  useEffect(() => {
+    void loadUnitProgress().then((p) => setNext(nextUnit(p)))
+  }, [])
 
   return (
     <div className="home">
@@ -62,6 +70,15 @@ export function Home({ userName, onPlay, onSettings, onSwitchUser }: Props) {
       <p className="nikud-row">בַּ בִּ בָּ</p>
       {group && <p className="group-tag">⭐ {group.name}</p>}
       <JourneyMap />
+      {next && (
+        <button className="btn primary lesson-btn" onClick={() => onLesson(next)}>
+          🎓 {t('שיעור של 3 דקות')}
+          <span className="lesson-btn-sub">{unitTitle(next)}</span>
+        </button>
+      )}
+      <button className="btn plan-btn" onClick={onPlan}>
+        📋 {t('מסלול הלימוד')}
+      </button>
       <div className="cards">
         {GAMES.map((g) => (
           <button

@@ -271,6 +271,8 @@ export type Group = {
   kind: 'words' | 'text'
   /** set when the group was added from the shared library */
   library_id?: string | null
+  /** set when the group was made from a unit of the learning plan */
+  unit_code?: string | null
   words: Word[]
 }
 
@@ -300,7 +302,7 @@ export async function loadContent(): Promise<Content> {
   const empty: Content = { groups: [], texts: [], recordings: [], praise: [] }
   if (!supabase) return empty
   const [groups, words, recordings, praise] = await Promise.all([
-    supabase.from('word_groups').select('id, name, sort_order, kind, library_id').order('sort_order'),
+    supabase.from('word_groups').select('id, name, sort_order, kind, library_id, unit_code').order('sort_order'),
     supabase
       .from('words')
       .select('id, group_id, text, plain_text, syllables, audio_path, sort_order')
@@ -416,5 +418,48 @@ export async function publishGroup(groupId: string, category: string): Promise<v
 export async function unpublishGroup(groupId: string): Promise<void> {
   if (!supabase) throw new Error(t('אין חיבור לשרת'))
   const { error } = await supabase.rpc('unpublish_group', { p_group: groupId })
+  if (error) throw new Error(error.message)
+}
+
+// ---------------------------------------------------------------------------
+// The learning plan: progress per unit
+
+export type UnitProgress = {
+  unit_code: string
+  points: number
+  seconds: number
+  sessions: number
+  correct: number
+  total: number
+  done: boolean
+  last_at: string
+}
+
+export async function loadUnitProgress(): Promise<UnitProgress[]> {
+  const userId = await getLearnerId()
+  if (!supabase || !userId) return []
+  const { data, error } = await supabase
+    .from('unit_progress')
+    .select('unit_code, points, seconds, sessions, correct, total, done, last_at')
+    .eq('user_id', userId)
+  if (error) console.warn('supabase: could not load the plan progress', error)
+  return data ?? []
+}
+
+export async function recordUnitProgress(unit: string, points: number, seconds: number, correct: number, total: number) {
+  if (!supabase) return
+  const { error } = await supabase.rpc('record_unit_progress', {
+    p_unit: unit,
+    p_points: points,
+    p_seconds: seconds,
+    p_correct: correct,
+    p_total: total,
+  })
+  if (error) console.warn('supabase: could not save the plan progress', error)
+}
+
+export async function setUnitDone(unit: string, done: boolean) {
+  if (!supabase) throw new Error(t('אין חיבור לשרת'))
+  const { error } = await supabase.rpc('set_unit_done', { p_unit: unit, p_done: done })
   if (error) throw new Error(error.message)
 }

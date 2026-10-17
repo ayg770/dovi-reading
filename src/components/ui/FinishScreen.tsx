@@ -5,6 +5,7 @@ import { advanceGroup } from '../../lib/supabase'
 import { Confetti } from './Confetti'
 import { StarBar } from './StarBar'
 import { t } from '../../lib/i18n'
+import { lesson, useLesson } from '../../lib/lesson'
 
 type Props = {
   score: number
@@ -23,12 +24,27 @@ export function FinishScreen({ score, total, groupId, groupName, onRestart, onEx
   const stars = ratio >= 0.9 ? 3 : ratio >= 0.6 ? 2 : 1
   const canAdvance = !!groupId && ratio >= 0.8
   const [state, setState] = useState<'idle' | 'busy' | 'last'>('idle')
+  const inLesson = useLesson().active
 
   useEffect(() => {
     sfx.finish()
     const t = setTimeout(() => void praise(), 1200)
+    if (lesson.get().active) lesson.report(score, total)
     return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // In a lesson the next game follows by itself.
+  const goOn = () => {
+    lesson.markNext()
+    onExit()
+  }
+  useEffect(() => {
+    if (!inLesson) return
+    const id = setTimeout(goOn, 4000)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inLesson])
 
   const advance = async () => {
     if (!groupId) return
@@ -52,6 +68,13 @@ export function FinishScreen({ score, total, groupId, groupName, onRestart, onEx
         ))}
       </div>
       {groupName && <p className="finish-group">{groupName}</p>}
+      {inLesson ? (
+        <div className="finish-actions big">
+          <button className="btn primary icon-btn" onClick={goOn} aria-label={t('הבא')}>
+            ▶
+          </button>
+        </div>
+      ) : (
       <div className="finish-actions big">
         {canAdvance && state !== 'last' && (
           <button
@@ -70,6 +93,7 @@ export function FinishScreen({ score, total, groupId, groupName, onRestart, onEx
           🏠
         </button>
       </div>
+      )}
       {state === 'last' && <p className="finish-group">🏆 🎉</p>}
       <StarBar />
     </div>

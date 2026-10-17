@@ -3,7 +3,10 @@ import { HearSyllableGame } from './components/games/HearSyllableGame'
 import { LiveReadGame } from './components/games/LiveReadGame'
 import { BuildWordGame } from './components/games/BuildWordGame'
 import { LetterGame } from './components/games/LetterGame'
+import { LessonRunner } from './components/games/LessonRunner'
 import { RsvpGame } from './components/games/RsvpGame'
+import { PlanView } from './components/ui/PlanView'
+import type { Unit } from './data/curriculum'
 import { RsvpPicker, RsvpChoice } from './components/ui/RsvpPicker'
 import { TextAutoGame } from './components/games/TextAutoGame'
 import { TrainGame } from './components/games/TrainGame'
@@ -27,6 +30,9 @@ const TITLES = {
   build_word: { title: t('בנה מילה'), icon: '🧩' },
 }
 type PickedGame = keyof typeof TITLES
+
+/** Length of a lesson in the plan. */
+const LESSON_MINUTES = 3
 const isPicked = (g: GameId): g is PickedGame => g in TITLES
 
 type Screen =
@@ -37,6 +43,8 @@ type Screen =
   | { kind: 'letters'; mode: 'similar' | 'right' }
   | { kind: 'text-pick' }
   | { kind: 'text-auto'; groupId: string; pace: number }
+  | { kind: 'plan' }
+  | { kind: 'lesson'; unit: Unit }
   | { kind: 'rsvp-pick' }
   | { kind: 'rsvp'; choice: RsvpChoice }
 
@@ -88,6 +96,32 @@ export default function App() {
             ? setScreen({ kind: 'text-auto', groupId: c.groupId, pace: c.pace })
             : setScreen({ kind: 'play', game: 'read_aloud', selection: { kind: 'group', groupId: c.groupId, rounds: 0 } })
         }
+      />
+    )
+
+  if (screen.kind === 'plan')
+    return (
+      <div className="picker">
+        <header className="game-bar">
+          <button className="btn small" onClick={home} aria-label={t('חזרה')}>
+            ✕
+          </button>
+          <h2 className="picker-title">📋 {t('מסלול הלימוד')}</h2>
+          <span />
+        </header>
+        <PlanView onLesson={(unit) => setScreen({ kind: 'lesson', unit })} onTexts={() => setScreen({ kind: 'text-pick' })} />
+      </div>
+    )
+
+  if (screen.kind === 'lesson')
+    return (
+      <LessonRunner
+        key={run}
+        unit={screen.unit}
+        minutes={LESSON_MINUTES}
+        onExit={home}
+        onPlan={() => setScreen({ kind: 'plan' })}
+        onAgain={() => setRun((r) => r + 1)}
       />
     )
 
@@ -144,6 +178,8 @@ export default function App() {
         else if (game === 'right_letter') setScreen({ kind: 'letters', mode: 'right' })
         else if (isPicked(game)) setScreen({ kind: 'pick', game })
       }}
+      onPlan={() => setScreen({ kind: 'plan' })}
+      onLesson={(unit) => setScreen({ kind: 'lesson', unit })}
       onSettings={() => setScreen({ kind: 'settings' })}
       onSwitchUser={() => switchAccount(null)}
     />

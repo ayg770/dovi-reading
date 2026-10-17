@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { PlanView } from '../components/ui/PlanView'
 import { GroupsTab } from '../components/settings/GroupsTab'
 import { PraiseTab } from '../components/settings/PraiseTab'
 import { ProgressTab } from '../components/settings/ProgressTab'
@@ -10,9 +11,10 @@ import { LanguageSwitch } from '../components/ui/LanguageSwitch'
 import { changeCode, updateProfile } from '../lib/supabase'
 import { t } from '../lib/i18n'
 
-type Tab = 'groups' | 'texts' | 'syllables' | 'progress' | 'praise' | 'profile'
+type Tab = 'plan' | 'groups' | 'texts' | 'syllables' | 'progress' | 'praise' | 'profile'
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'plan', label: t('📋 מסלול') },
   { id: 'groups', label: t('📚 קבוצות מילים') },
   { id: 'texts', label: t('📖 טקסטים') },
   { id: 'syllables', label: t('🎙️ הקלטות הברות') },
@@ -55,6 +57,7 @@ export function Settings({ onExit }: { onExit: () => void }) {
               </button>
             ))}
           </nav>
+          {tab === 'plan' && <PlanView manage />}
           {tab === 'groups' && <GroupsTab />}
           {tab === 'texts' && <TextsTab />}
           {tab === 'syllables' && <SyllablesTab />}

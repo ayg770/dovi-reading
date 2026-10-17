@@ -1818,3 +1818,106 @@ select {
 .library h4 {
   margin: 10px 0 4px;
 }
+
+/* learning plan */
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.plan-stage h3 {
+  margin: 14px 0 6px;
+}
+.plan-unit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+  border: 3px solid transparent;
+  margin-bottom: 6px;
+}
+.plan-unit.next {
+  border-color: var(--accent);
+  background: #fff3e8;
+}
+.plan-unit.done {
+  opacity: 0.8;
+}
+.plan-icon {
+  font-size: 1.4rem;
+  width: 1.8rem;
+  text-align: center;
+}
+.plan-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.plan-title {
+  font-weight: 700;
+}
+.plan-items {
+  font-family: 'Frank Ruhl Libre', serif;
+  font-size: 1.25rem;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+.plan-stats {
+  font-size: 0.85rem;
+}
+.plan-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plan-done {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.lesson-bar {
+  position: fixed;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 14px;
+  background: var(--card);
+  border-radius: 999px;
+  padding: 2px 14px;
+  font-weight: 700;
+  box-shadow: 0 2px 0 rgba(43, 33, 64, 0.1);
+  font-size: 0.9rem;
+}
+.lesson-stats {
+  display: flex;
+  gap: 18px;
+  font-size: 1.5rem;
+}
+
+.lesson-btn {
+  width: 100%;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 1.3rem;
+  margin: 8px 0 4px;
+}
+.lesson-btn-sub {
+  font-size: 0.9rem;
+  font-weight: 500;
+  opacity: 0.95;
+}
+.plan-btn {
+  width: 100%;
+  margin-bottom: 8px;
+}

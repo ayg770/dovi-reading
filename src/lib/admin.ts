@@ -113,17 +113,18 @@ export async function splitGroup(group: Group, size: number) {
   await refreshContent()
 }
 
-export async function createGroup(name: string, lines: string[], kind: 'words' | 'text' = 'words') {
+export async function createGroup(name: string, lines: string[], kind: 'words' | 'text' = 'words', unitCode: string | null = null): Promise<string> {
   const owner = await me()
   const groups = getContent().groups
   const sortOrder = groups.length ? Math.max(...groups.map((g) => g.sort_order)) + 1 : 1
   const { data } = check(
-    await db().from('word_groups').insert({ name, sort_order: sortOrder, user_id: owner, kind }).select('id').single(),
+    await db().from('word_groups').insert({ name, sort_order: sortOrder, user_id: owner, kind, unit_code: unitCode }).select('id').single(),
   )
   const unique = [...new Set(lines)]
   if (unique.length)
     check(await db().from('words').insert(unique.map((t, i) => wordRow(owner, data!.id, t, i + 1))))
   await refreshContent()
+  return data!.id as string
 }
 
 /** Rename and set the words; words that stay keep their recordings. */
