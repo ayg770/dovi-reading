@@ -13,7 +13,7 @@ function walk(dir) {
 const keys = new Set()
 const files = walk('src')
 for (const f of files) {
-  if (f.endsWith('lib/i18n.ts') || f.endsWith('ru.ts')) continue
+  if (f.endsWith('lib/i18n.ts') || f.endsWith('ru.ts') || f.endsWith('fa.ts')) continue
   const s = readFileSync(f, 'utf8')
   for (const m of s.matchAll(/\bt\(\s*'((?:[^'\\\n]|\\.)*)'/g)) keys.add(m[1].replace(/\\'/g, "'"))
   for (const m of s.matchAll(/\bt\(\s*"((?:[^"\\\n]|\\.)*)"/g)) keys.add(m[1])
@@ -30,12 +30,16 @@ for (const f of files) {
 // error keys returned by errorKey()
 for (const m of readFileSync('src/lib/supabase.ts', 'utf8').matchAll(/return '([^']*[א-ת][^']*)'/g)) keys.add(m[1])
 
-const ru = readFileSync('src/lib/ru.ts', 'utf8')
-const have = new Set([...ru.matchAll(/^\s*'((?:[^'\\\n]|\\.)*)':/gm)].map((m) => m[1].replace(/\\'/g, "'")))
+const dict = (file) =>
+  new Set([...readFileSync(file, 'utf8').matchAll(/^\s*'((?:[^'\\\n]|\\.)*)':/gm)].map((m) => m[1].replace(/\\'/g, "'")))
+const have = dict('src/lib/ru.ts')
+const haveFa = dict('src/lib/fa.ts')
 const missing = [...keys].filter((k) => !have.has(k))
+const missingFa = [...keys].filter((k) => !haveFa.has(k))
 const unused = [...have].filter((k) => !keys.has(k))
 if (process.argv.includes('--list')) console.log([...keys].join('\n'))
-console.log(`${keys.size} texts, ${missing.length} without Russian, ${unused.length} unused entries`)
+console.log(`${keys.size} texts, ${missing.length} without Russian, ${missingFa.length} without Persian, ${unused.length} unused entries`)
+for (const k of missingFa) console.log('MISSING-FA:', k)
 for (const k of missing) console.log('MISSING:', k)
 for (const k of unused) console.log('UNUSED:', k)
-process.exit(missing.length ? 1 : 0)
+process.exit(missing.length || missingFa.length ? 1 : 0)

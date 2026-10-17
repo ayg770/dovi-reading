@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BASIC_NIKUD_IDS, NIKUD, SYLLABLE_LETTERS, syllableText } from '../../data/hebrew'
-import { getLang, t } from '../../lib/i18n'
+import { dateLocale, t } from '../../lib/i18n'
 import { useStars } from '../../lib/stars'
 import { ProgressRow, SessionRow, loadProgress, loadSessions } from '../../lib/supabase'
 
@@ -12,7 +12,7 @@ const GAME_NAMES: Record<string, string> = {
   similar_letters: 'אותיות דומות',
   right_letter: 'האות הנכונה',
   read_text: 'קריאת טקסט',
-  rsvp: 'קריאה ברצף',
+  rsvp: 'קריאה בשטף',
 }
 
 function cellClass(row?: ProgressRow): string {
@@ -45,7 +45,7 @@ export function ProgressTab() {
     .filter((r) => r.attempts >= 2 && r.correct / r.attempts < 0.7)
     .sort((a, b) => a.correct / a.attempts - b.correct / b.attempts)
     .slice(0, 10)
-  const date = new Intl.DateTimeFormat(getLang() === 'ru' ? 'ru-RU' : 'he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const date = new Intl.DateTimeFormat(dateLocale(), { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
     <div className="panel">

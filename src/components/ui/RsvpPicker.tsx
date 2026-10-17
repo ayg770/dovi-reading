@@ -100,7 +100,7 @@ export function RsvpPicker({ onStart, onExit }: { onStart: (c: RsvpChoice) => vo
         <button className="btn small" onClick={onExit} aria-label={t('חזרה')}>
           ✕
         </button>
-        <h2 className="picker-title">⚡ {t('קריאה ברצף')}</h2>
+        <h2 className="picker-title">⚡ {t('קריאה בשטף')}</h2>
         <span />
       </header>
 

@@ -26,7 +26,7 @@ const GAMES: GameCard[] = [
   { id: 'similar_letters', icon: '🔍', title: t('אותיות דומות'), subtitle: t('מי מהן?') },
   { id: 'right_letter', icon: '✅', title: t('האות הנכונה'), subtitle: t('הפוכה, שבורה, או נכונה?') },
   { id: 'read_text', icon: '📖', title: t('קריאת טקסט'), subtitle: t('טקסטים משלי') },
-  { id: 'rsvp', icon: '⚡', title: t('קריאה ברצף'), subtitle: t('מילים בזו אחר זו, בקצב שבוחרים') },
+  { id: 'rsvp', icon: '⚡', title: t('קריאה בשטף'), subtitle: t('מילים בזו אחר זו, בקצב שבוחרים') },
 ]
 
 type Props = {
