@@ -1416,6 +1416,45 @@ select {
   letter-spacing: 0.4em;
 }
 
+.glyph.dotin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 0.14em;
+  height: 0.14em;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+.glyph.underline::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 0.02em;
+  height: 0.06em;
+  background: currentColor;
+}
+.glyph.tick::after {
+  content: '';
+  position: absolute;
+  top: 0.12em;
+  right: 0.02em;
+  width: 0.22em;
+  height: 0.06em;
+  background: currentColor;
+  transform: rotate(-35deg);
+}
+.glyph.cutright {
+  -webkit-mask-image: linear-gradient(to left, transparent 0 22%, #000 22%);
+  mask-image: linear-gradient(to left, transparent 0 22%, #000 22%);
+}
+.glyph.cutbottom {
+  -webkit-mask-image: linear-gradient(to top, transparent 0 24%, #000 24%);
+  mask-image: linear-gradient(to top, transparent 0 24%, #000 24%);
+}
+
 /* Build a word */
 .build {
   gap: 14px;
@@ -1708,4 +1747,55 @@ select {
   gap: 8px;
   align-items: center;
   font-weight: 600;
+}
+
+/* live reading: green as it is read */
+.read-card.live {
+  width: 100%;
+  min-width: 0;
+  padding: 20px 14px;
+}
+.read-card.live.flash {
+  border-color: var(--wrong);
+  background: #fff0f0;
+  animation: shake 0.4s;
+}
+.live-read .read-text.sentence {
+  font-size: clamp(2rem, 9vw, 3.2rem);
+}
+.lw {
+  display: inline-block;
+  margin: 0 8px;
+  padding: 0 6px;
+  border-radius: 14px;
+  color: var(--ink);
+  transition: color 0.2s, background 0.2s;
+}
+.lw.cur {
+  background: #fff3e8;
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+.lw.ok,
+.ls.ok {
+  color: #1f9d55;
+}
+.lw.ok {
+  background: #e6f8ee;
+}
+.lw.miss {
+  color: #d63a45;
+  background: #ffeaea;
+}
+.ls.on {
+  background: var(--accent);
+  color: white;
+  border-radius: 10px;
+}
+.big-mic {
+  font-size: 1.6rem;
+  gap: 12px;
+}
+.big-mic.on {
+  background: #e6f8ee;
+  border: 3px solid var(--right);
 }

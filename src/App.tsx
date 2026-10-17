@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { HearSyllableGame } from './components/games/HearSyllableGame'
-import { ReadAloudGame } from './components/games/ReadAloudGame'
+import { LiveReadGame } from './components/games/LiveReadGame'
 import { BuildWordGame } from './components/games/BuildWordGame'
 import { LetterGame } from './components/games/LetterGame'
 import { RsvpGame } from './components/games/RsvpGame'
@@ -129,7 +129,7 @@ export default function App() {
       },
     }
     if (screen.game === 'hear_syllable') return <HearSyllableGame {...props} />
-    if (screen.game === 'read_aloud') return <ReadAloudGame {...props} />
+    if (screen.game === 'read_aloud') return <LiveReadGame {...props} />
     if (screen.game === 'syllable_train') return <TrainGame {...props} />
     return <BuildWordGame {...props} />
   }

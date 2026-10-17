@@ -12,8 +12,38 @@ import { Stars } from '../ui/Stars'
 const ROUNDS = 10
 
 type Mode = 'similar' | 'right'
-type Distortion = 'normal' | 'mirror' | 'flip' | 'rotate' | 'broken' | 'extras'
+type Distortion =
+  | 'normal'
+  | 'mirror'
+  | 'flip'
+  | 'rotate'
+  | 'broken'
+  | 'extras'
+  | 'dotin'
+  | 'underline'
+  | 'tick'
+  | 'cutright'
+  | 'cutbottom'
 const DISTORTIONS: Exclude<Distortion, 'normal'>[] = ['mirror', 'flip', 'rotate', 'broken', 'extras']
+/** A small addition or a missing piece: the letter is almost right. */
+const SUBTLE: Exclude<Distortion, 'normal'>[] = ['dotin', 'underline', 'tick', 'cutright', 'cutbottom', 'extras', 'broken']
+
+/** Letters whose names sound alike (so a hearing-only mistake is possible). */
+const SOUND_GROUPS: string[][] = [
+  ['א', 'ע'],
+  ['ט', 'ת'],
+  ['כ', 'ק', 'ח'],
+  ['ס', 'ש'],
+  ['ב', 'ו'],
+  ['ב', 'פ'],
+  ['ז', 'צ'],
+  ['נ', 'מ'],
+  ['ד', 'ג'],
+]
+const soundAlikes = (glyph: string): Letter[] =>
+  [...new Set(SOUND_GROUPS.filter((g) => g.includes(glyph)).flat())]
+    .filter((g) => g !== glyph)
+    .map((g) => LETTERS.find((l) => l.glyph === g)!)
 
 type Option = { key: string; letter: Letter; distortion: Distortion }
 type Question = { target: Letter; options: Option[] }
@@ -43,7 +73,17 @@ function makeQuestion(mode: Mode, recent: string[]): Question {
       options: shuffle([target, ...picks].map((letter) => ({ key: letter.glyph, letter, distortion: 'normal' as const }))),
     }
   }
-  const wrong = shuffle(DISTORTIONS).slice(0, 2)
+  // 'right': a mix of ways to be wrong — looks alike, sounds alike, almost the same letter, or turned around.
+  const kind = pick(['look', 'sound', 'subtle', 'subtle', 'distort'] as const)
+  const plain = (letter: Letter): Option => ({ key: letter.glyph, letter, distortion: 'normal' })
+  if (kind === 'look' || kind === 'sound') {
+    const lookAlikes = similarLetters(target.glyph).map((g) => LETTERS.find((l) => l.glyph === g)!)
+    const others = kind === 'look' ? lookAlikes : soundAlikes(target.glyph)
+    const fill = shuffle(PLAIN_POOL.filter((l) => l.glyph !== target.glyph && !others.includes(l)))
+    const picks = [...shuffle(others), ...shuffle(lookAlikes.filter((l) => !others.includes(l))), ...fill].slice(0, 2)
+    if (picks.length === 2) return { target, options: shuffle([target, ...picks].map(plain)) }
+  }
+  const wrong = shuffle(kind === 'distort' ? DISTORTIONS : SUBTLE).slice(0, 2)
   return {
     target,
     options: shuffle([
@@ -83,7 +123,10 @@ export function LetterGame({ mode, onExit, onRestart }: Props) {
     if (!done) void playLetterName(question.target)
   }, [question, done])
 
-  const answer = useMemo(() => question.options.find((o) => o.distortion === 'normal' && o.letter.glyph === question.target.glyph)!, [question])
+  const answer = useMemo(
+    () => question.options.find((o) => o.distortion === 'normal' && o.letter.glyph === question.target.glyph)!,
+    [question],
+  )
 
   const choose = (o: Option) => {
     if (status === 'right') return

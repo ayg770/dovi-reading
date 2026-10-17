@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { playItem, sfx, stopAudio } from '../../lib/audio'
-import { Item } from '../../lib/items'
 import { Selection } from '../../lib/selection'
-import { Stream, canRecognize, heardMatches, streamListen } from '../../lib/speech'
+import { LiveMatcher } from '../../lib/liveReader'
+import { Stream, canRecognize, streamListen } from '../../lib/speech'
 import { earnStar } from '../../lib/stars'
 import { finishSession, recordAnswer, startSession } from '../../lib/supabase'
 import { t } from '../../lib/i18n'
@@ -31,18 +31,16 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
   const [score, setScore] = useState(0)
   const [done, setDone] = useState(false)
   const [confetti, setConfetti] = useState(0)
+  const [syl, setSyl] = useState(0)
+  const [heard, setHeard] = useState('')
 
   const stream = useRef<Stream | null>(null)
   const session = useRef<Promise<string | null> | null>(null)
-  const idxRef = useRef(0)
-  const itemsRef = useRef<Item[]>([])
-  const missesRef = useRef(0)
+  const matcher = useRef<LiveMatcher | null>(null)
   const used = useRef(new Map<number, number>())
   const scoreRef = useRef(0)
   const details = useRef<unknown[]>([])
   const carRefs = useRef<(HTMLDivElement | null)[]>([])
-
-  itemsRef.current = items ?? []
 
   useEffect(() => {
     session.current ??= startSession('syllable_train')
@@ -61,66 +59,61 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
     carRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [idx, started])
 
-  const finishCar = (result: 'ok' | 'skip') => {
-    const i = idxRef.current
-    const list = itemsRef.current
-    if (i >= list.length) return
-    const first = missesRef.current === 0
-    for (const s of list[i].syllables)
-      if (s.letter_id && s.nikud_id) void recordAnswer(s.letter_id, s.nikud_id, result === 'ok' && first)
-    details.current.push({ item: list[i].text, result, misses: missesRef.current })
-    if (result === 'ok') {
-      sfx.correct()
-      if (first) {
-        scoreRef.current += 1
-        setScore(scoreRef.current)
-        earnStar()
-        setConfetti((c) => c + 1)
-      }
-    } else sfx.tap()
-    setCars((cs) => cs.map((c, k) => (k === i ? result : c)))
-    missesRef.current = 0
-    used.current = new Map()
-    idxRef.current = i + 1
-    if (i + 1 >= list.length) {
-      stream.current?.stop()
-      setDone(true)
-      void session.current?.then((id) => finishSession(id, list.length, scoreRef.current, details.current))
-    } else setIdx(i + 1)
-  }
-
-  const onHeard = (alts: string[], isFinal: boolean, resultIndex: number) => {
-    const cur = itemsRef.current[idxRef.current]
-    if (!cur) return
-    const from = used.current.get(resultIndex) ?? 0
-    // Only what has not been used for an earlier car: a result may hold several syllables.
-    for (const alt of alts) {
-      const tokens = alt.split(/\s+/).filter(Boolean)
-      for (let j = from; j < tokens.length; j++) {
-        if (heardMatches([tokens.slice(from, j + 1).join(' ')], cur.syllables)) {
-          used.current.set(resultIndex, j + 1)
-          finishCar('ok')
-          return
-        }
-      }
-    }
-    if (isFinal) {
-      used.current.set(resultIndex, 9999)
-      missesRef.current += 1
-      setMiss(true)
-      sfx.wrong()
-      window.setTimeout(() => setMiss(false), 700)
-    }
-  }
+  /** Build the matcher once the cars are known: one word (car) after the other. */
+  useEffect(() => {
+    if (!items) return
+    matcher.current = new LiveMatcher(
+      items.map((it) => ({ text: it.text, syllables: it.syllables })),
+      {
+        onSyllable: (_wi, si) => {
+          setSyl(si + 1)
+          sfx.tap()
+        },
+        onWord: (wi, result, m) => {
+          const it = items[wi]
+          for (const s of it.syllables) if (s.letter_id && s.nikud_id) void recordAnswer(s.letter_id, s.nikud_id, result === 'ok' && m === 0)
+          details.current.push({ item: it.text, result, misses: m })
+          setCars((cs) => cs.map((c, k) => (k === wi ? (result === 'ok' ? 'ok' : 'skip') : c)))
+          setSyl(0)
+          setIdx(wi + 1)
+          if (result === 'ok') {
+            sfx.correct()
+            if (m === 0) {
+              scoreRef.current += 1
+              setScore(scoreRef.current)
+              earnStar()
+              setConfetti((c) => c + 1)
+            }
+          }
+        },
+        onMiss: () => {
+          setMiss(true)
+          sfx.wrong()
+          window.setTimeout(() => setMiss(false), 700)
+        },
+        onDone: () => {
+          stream.current?.stop()
+          setDone(true)
+          void session.current?.then((id) => finishSession(id, items.length, scoreRef.current, details.current))
+        },
+      },
+      used.current,
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items])
 
   const start = () => {
     setStarted(true)
     sfx.start()
     if (!canRecognize) return setMic('error')
     stream.current = streamListen({
-      onHeard,
+      onHeard: (alts, isFinal, ri) => {
+        setHeard(alts[0])
+        matcher.current?.feed(alts, isFinal, ri)
+      },
       onState: (state, error) => {
         setMic(state)
+        if (state === 'restarting') used.current.clear()
         if (state === 'error') {
           setMicError(
             error === 'not-allowed' || error === 'service-not-allowed'
@@ -172,7 +165,15 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
             }}
             className={`car ${cars[i] ?? 'wait'}${started && i === idx ? ' on' : ''}${i === idx && miss ? ' miss' : ''}`}
           >
-            <span className="car-text">{it.text}</span>
+            <span className="car-text">
+              {i === idx && it.syllables.length > 1
+                ? it.syllables.map((sy, k) => (
+                    <span key={k} className={k < syl ? 'ls ok' : 'ls'}>
+                      {sy.text}
+                    </span>
+                  ))
+                : it.text}
+            </span>
             <span className="wheels">⚫ ⚫</span>
           </div>
         ))}
@@ -188,16 +189,17 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
             <span className="mic-dot" />
             🎤
           </div>
+          <p className="heard">{heard ? t('שמעתי: {text}', { text: heard }) : '👂'}</p>
           {micError && <p className="hint-text">{micError}</p>}
           {mic === 'error' && !micError && <p className="hint-text">{t('זיהוי הקול לא זמין כרגע')}</p>}
           <div className="finish-actions">
             <button className="btn icon-btn" onClick={() => void playItem(current)} aria-label={t('שמע')}>
               🔊
             </button>
-            <button className="btn good icon-btn" onClick={() => finishCar('ok')} aria-label={t('הורה: הוא אמר נכון ✓')}>
+            <button className="btn good icon-btn" onClick={() => matcher.current?.settle('ok')} aria-label={t('הורה: הוא אמר נכון ✓')}>
               ✓
             </button>
-            <button className="btn icon-btn" onClick={() => finishCar('skip')} aria-label={t('דלג')}>
+            <button className="btn icon-btn" onClick={() => matcher.current?.settle('miss')} aria-label={t('דלג')}>
               ⏭
             </button>
           </div>
