@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Unit } from '../../data/curriculum'
 import { sfx } from '../../lib/audio'
 import { lesson } from '../../lib/lesson'
@@ -42,7 +42,11 @@ export function LessonRunner({ unit, minutes, onExit, onPlan, onAgain }: Props) 
   }, [])
 
   const sequence: Step[] =
-    unit.kind === 'singles' ? ['hear_syllable', 'read_aloud', 'syllable_train'] : ['hear_syllable', 'build_word', 'read_aloud', 'syllable_train']
+    unit.kind === 'sentences'
+      ? ['read_aloud']
+      : unit.kind === 'singles'
+        ? ['hear_syllable', 'read_aloud', 'syllable_train']
+        : ['hear_syllable', 'build_word', 'read_aloud', 'syllable_train']
 
   useEffect(() => {
     lesson.start()
@@ -56,6 +60,9 @@ export function LessonRunner({ unit, minutes, onExit, onPlan, onAgain }: Props) 
   useEffect(() => {
     if (loaded && starsAtStart.current === null) starsAtStart.current = stars
   }, [loaded, stars])
+
+  // The same object for the whole step: a new one would make the game start over (the clock below re-renders every second).
+  const selection = useMemo<Selection>(() => ({ kind: 'group', groupId: groupId ?? '', rounds: ROUNDS }), [groupId, step])
 
   const seconds = () => Math.round((Date.now() - startedAt.current) / 1000)
   const points = () => Math.max(0, stars - (starsAtStart.current ?? stars))
@@ -117,7 +124,6 @@ export function LessonRunner({ unit, minutes, onExit, onPlan, onAgain }: Props) 
   }
 
   const game = sequence[step % sequence.length]
-  const selection: Selection = { kind: 'group', groupId, rounds: ROUNDS }
   const props = { key: step, selection, onExit: next, onRestart: () => {}, onPlayGroup: () => {} }
   const remaining = Math.max(0, minutes * 60 - seconds())
 

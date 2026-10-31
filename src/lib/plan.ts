@@ -11,6 +11,7 @@ const nikudName = (id: number | null) => {
 }
 
 export function stageName(stage: Stage): string {
+  if (stage.key === 'class') return t('משימות מהכיתה: קמץ ופתח')
   if (stage.nikudId) return nikudName(stage.nikudId)
   if (stage.key === 'mixed') return t('כל התנועות יחד')
   if (stage.key === 'closed') return t('שווא והברות סגורות')
@@ -18,10 +19,12 @@ export function stageName(stage: Stage): string {
 }
 
 export function stageTitle(stage: Stage): string {
+  if (stage.n === 0) return stageName(stage)
   return t('שלב {n}: {name}', { n: stage.n, name: stageName(stage) })
 }
 
 export function unitTitle(u: Unit): string {
+  if (u.label) return t(u.label)
   const base = u.nikudId ? nikudName(u.nikudId) : u.stage === 9 ? t('כל התנועות יחד') : u.stage === 10 ? t('מילים') : t('טקסטים')
   const kind =
     u.kind === 'singles' ? t('הברות בודדות') : u.kind === 'pairs' ? t('שתי הברות') : u.kind === 'triples' ? t('שלוש הברות') : u.kind === 'words' ? '' : t('קריאת תהילים וטקסטים')
@@ -32,12 +35,13 @@ export function unitTitle(u: Unit): string {
 /** Copy a unit into the user's own groups (once) and make it the current group; returns the group id. */
 export async function installUnit(u: Unit): Promise<string> {
   const content = await ensureContent()
-  const have = content.groups.find((g) => g.unit_code === u.code)
+  const have = [...content.groups, ...content.texts].find((g) => g.unit_code === u.code)
   if (have) {
     await setCurrentGroup(have.id)
     return have.id
   }
-  const id = await createGroup(`${t('שלב {n}: {name}', { n: u.stage, name: unitTitle(u) })}`, u.items, 'words', u.code)
+  const name = u.stage === 0 ? unitTitle(u) : t('שלב {n}: {name}', { n: u.stage, name: unitTitle(u) })
+  const id = await createGroup(name, u.items, u.kind === 'sentences' ? 'text' : 'words', u.code)
   await setCurrentGroup(id)
   return id
 }

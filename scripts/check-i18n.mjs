@@ -25,6 +25,7 @@ for (const f of files) {
     scope = s.slice(s.indexOf('export const NIKUD:'), s.indexOf('export const SYLLABLE_LETTERS'))
     scope += s.slice(s.indexOf('export const NIKUD_KEYBOARD'), s.indexOf('type Unit'))
   }
+  if (f.endsWith('data/curriculum.ts')) for (const m of s.matchAll(/label: '([^']+)'|unit\('[^']+', '([^']+)'/g)) keys.add(m[1] ?? m[2])
   for (const m of scope.matchAll(/name:\s*'([^']*[\u05D0-\u05EA][^']*)'/g)) keys.add(m[1])
 }
 // error keys returned by errorKey()

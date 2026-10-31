@@ -4,7 +4,7 @@ import { LETTERS, NIKUD, parseText, syllableText } from './hebrew'
 // The units are generated here and copied into the user's own groups when they start them
 // (so each user can edit their copy). Order follows the one we began with: kamatz, patach, hiriq…
 
-export type UnitKind = 'singles' | 'pairs' | 'triples' | 'words' | 'texts'
+export type UnitKind = 'singles' | 'pairs' | 'triples' | 'words' | 'sentences' | 'texts'
 
 export type Unit = {
   /** stable id, kept in the user's group (unit_code) and in the progress table */
@@ -15,6 +15,8 @@ export type Unit = {
   nikudId: number | null
   /** the practice items (pointed Hebrew) — empty for texts */
   items: string[]
+  /** a fixed name (Hebrew, translated with t) for units that are not generated: the class worksheets */
+  label?: string
   /** which part of a split list this is (1, 2, 3…) and how many parts */
   part: number
   parts: number
@@ -259,7 +261,57 @@ function build(): Stage[] {
   return stages
 }
 
-export const STAGES: Stage[] = build()
+/**
+ * The worksheets from the class (kamatz and patach week): each task as a unit, so it can be
+ * practiced and tested here. Copied from photos of the sheets; check them against the paper.
+ */
+function classStage(): Stage {
+  const unit = (code: string, label: string, kind: UnitKind, items: string[]): Unit => ({
+    code,
+    stage: 0,
+    kind,
+    nikudId: null,
+    label,
+    items,
+    part: 1,
+    parts: 1,
+  })
+  const letters = ['שׁ', 'מ', 'ח', 'א', 'פּ', 'ג', 'ט', 'צ', 'ל']
+  return {
+    n: 0,
+    key: 'class',
+    nikudId: null,
+    units: [
+      unit('k1-a', 'עבודה א׳: קמץ ופתח עם האות א', 'singles', ['אָ', 'אַ']),
+      unit('k1-b', 'עבודה ב׳: קמץ ופתח בהברות בודדות', 'singles', [
+        'חַ', 'צַ', 'בַ', 'שַׁ', 'לַ', 'פַּ', 'רַ', 'גַ', 'סַ', 'הַ',
+        'זָ', 'קָ', 'תָ', 'וָ', 'טָ', 'כָ', 'אָ', 'דָ', 'מָ',
+      ]),
+      unit('k1-c1', 'עבודה ג׳: מעברים בין קמץ ופתח במילים (1)', 'words', [
+        'צַמַה', 'בַּנַה', 'עַרַבַה', 'נַפַּה', 'סַחַבַה',
+        'רָצָה', 'שָׂרָה', 'צָעָקָה', 'מָצָאתָ', 'יָדָע',
+      ]),
+      unit('k1-c2', 'עבודה ג׳: מעברים בין קמץ ופתח במילים (2)', 'words', [
+        'מַצָה', 'פָּסַע', 'לָשָׂה', 'יָדַע', 'דַּקָה',
+        'בַּקָשָׁה', 'רָחַצָה', 'נָסַעַת', 'תַּבַּעָנָה',
+        'רָאָתָה', 'מָצָאתָ', 'שָׁמַעַתָ', 'תַּחַנָה',
+        'הַמַּחַלָקָה', 'דַּאַגָתָה', 'הָאַדָמָה',
+      ]),
+      unit('k1-d1', 'עבודה ד׳: מעברים בין קמץ ופתח באותו אות', 'singles', letters.flatMap((g) => [g + 'ַ', g + 'ָ'])),
+      unit('k1-e', 'עבודה ה׳: מעברים בין קמץ ופתח עם כל האותיות', 'singles', [
+        'וַ', 'כָא', 'פָּה', 'שַׁ', 'זַע', 'דָ', 'נָא', 'עַ', 'חַה', 'רָא', 'תַּא', 'הָ', 'מַה', 'בָּה',
+        'תַ', 'פָּא', 'יַ', 'סַע', 'קַע', 'אָ', 'גַע', 'דָּ', 'שָׂא', 'טַע', 'כַּ', 'לָא', 'דַה', 'מָ', 'צָא',
+      ]),
+      unit('k1-d2', 'עבודה ד׳: מעברים בין קמץ ופתח במשפטים', 'sentences', [
+        'אַבָּא אָפָה חַלָה יָפָה',
+        'חַנָה נָסָעָה בָּעַגָלָה הַחַדָשָׁה',
+        'סַבָּא עָלָה מַעַלָה לַחַנָיָה',
+      ]),
+    ],
+  }
+}
+
+export const STAGES: Stage[] = [classStage(), ...build()]
 export const UNITS: Unit[] = STAGES.flatMap((s) => s.units)
 export const unitByCode = (code: string) => UNITS.find((u) => u.code === code)
 
