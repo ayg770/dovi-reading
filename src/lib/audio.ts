@@ -181,6 +181,10 @@ export const sfx = {
   start() {
     bloop(300, 700, 0, 0.18, 0.15)
   },
+  /** A soft, low tick: the quiet beat of the fluent-reading pace. */
+  tick() {
+    bloop(260, 190, 0, 0.07, 0.05)
+  },
   finish() {
     const notes = [523, 659, 784, 1047] // C E G C
     notes.forEach((f, i) => bell(f, i * 0.12, 0.5))

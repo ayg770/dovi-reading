@@ -12,6 +12,8 @@ export type RsvpChoice = {
   stress: boolean
   nikud: boolean
   ramp: boolean
+  /** a soft tick at the pace, in the background */
+  beat: boolean
 }
 
 const KEY = 'dovi-rsvp-choice'
@@ -51,6 +53,7 @@ export function RsvpPicker({ onStart, onExit }: { onStart: (c: RsvpChoice) => vo
   const [stress, setStress] = useState(initial.stress ?? false)
   const [nikud, setNikud] = useState(initial.nikud ?? true)
   const [ramp, setRamp] = useState(initial.ramp ?? true)
+  const [beat, setBeat] = useState(initial.beat ?? true)
   const [note, setNote] = useState<string | null>(null)
   const [history, setHistory] = useState<Awaited<ReturnType<typeof loadRsvpHistory>>>([])
 
@@ -78,7 +81,7 @@ export function RsvpPicker({ onStart, onExit }: { onStart: (c: RsvpChoice) => vo
 
   const start = () => {
     if (!chosen) return
-    const c: RsvpChoice = { groupId: chosen.id, wpm, chunk, focal: focal && chunk === 1, stress: regular && stress, nikud, ramp }
+    const c: RsvpChoice = { groupId: chosen.id, wpm, chunk, focal: focal && chunk === 1, stress: regular && stress, nikud, ramp, beat }
     try {
       localStorage.setItem(KEY, JSON.stringify(c))
     } catch {
@@ -161,6 +164,9 @@ export function RsvpPicker({ onStart, onExit }: { onStart: (c: RsvpChoice) => vo
           </Toggle>
           <Toggle on={ramp} onChange={setRamp}>
             {t('להתחיל לאט ולהאיץ בהדרגה')}
+          </Toggle>
+          <Toggle on={beat} onChange={setBeat}>
+            {t('צליל עדין ברקע בקצב הקריאה')}
           </Toggle>
           {chunk === 1 && (
             <Toggle on={focal} onChange={setFocal}>

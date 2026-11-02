@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ensureContent } from '../../lib/content'
 import { sfx } from '../../lib/audio'
 import { t } from '../../lib/i18n'
@@ -73,6 +73,8 @@ export function RsvpGame({ choice, onExit, onRestart }: Props) {
   const [playing, setPlaying] = useState(true)
   const [wpm, setWpm] = useState(choice.wpm)
   const [size, setSize] = useState(1)
+  const [beat, setBeat] = useState(choice.beat ?? true)
+  const stage = useRef<HTMLDivElement | null>(null)
   const [done, setDone] = useState(false)
   const session = useRef<Promise<string | null> | null>(null)
   const peak = useRef(choice.wpm)
@@ -91,6 +93,7 @@ export function RsvpGame({ choice, onExit, onRestart }: Props) {
   useEffect(() => {
     if (count === null) return
     if (count === 0) return setCount(null)
+    if (beat) sfx.tick()
     const id = window.setTimeout(() => setCount(count - 1), 800)
     return () => window.clearTimeout(id)
   }, [count])
@@ -113,6 +116,25 @@ export function RsvpGame({ choice, onExit, onRestart }: Props) {
     peak.current = Math.max(peak.current, wpm)
   }, [wpm])
 
+  // The soft beat in the background: one tick per frame, thinned out when the pace is fast.
+  useEffect(() => {
+    if (!beat || !playing || count !== null || done) return
+    const perFrame = choice.chunk === 'syl' ? 0.5 : choice.chunk
+    const every = Math.max(1, Math.ceil(wpm / 60 / perFrame / 2.5))
+    if (idx % every === 0) sfx.tick()
+  }, [idx, beat, playing, count, done, wpm, choice.chunk])
+
+  // The word as large as asked, but never wider than the screen.
+  useLayoutEffect(() => {
+    const el = stage.current
+    const word = el?.firstElementChild as HTMLElement | null
+    if (!el || !word) return
+    const want = Math.min(64, Math.max(35, window.innerWidth * 0.11)) * size
+    el.style.fontSize = `${want}px`
+    const room = el.clientWidth - 32
+    if (word.scrollWidth > room && room > 0) el.style.fontSize = `${(want * room) / word.scrollWidth}px`
+  })
+
   if (!text) return <div className="game loading">…</div>
   if (!frames.length) return <div className="game loading">{t('אין שורות בטקסט')}</div>
 
@@ -133,6 +155,12 @@ export function RsvpGame({ choice, onExit, onRestart }: Props) {
     const target = Math.max(0, frames[idx].word - 10)
     setIdx(frames.findIndex((f) => f.word >= target))
   }
+  /** One word back (the whole word, also when it is shown syllable by syllable). */
+  const backWord = () => {
+    if (choice.chunk !== 'syl') return setIdx(Math.max(0, idx - 1))
+    const target = Math.max(0, frames[idx].word - (idx > 0 && frames[idx - 1].word === frames[idx].word ? 0 : 1))
+    setIdx(frames.findIndex((f) => f.word >= target))
+  }
 
   return (
     <div className="game rsvp">
@@ -147,21 +175,35 @@ export function RsvpGame({ choice, onExit, onRestart }: Props) {
       </header>
       <p className="group-tag">{text.name}</p>
 
-      <div className="rsvp-stage" dir="rtl" style={{ fontSize: `calc(clamp(2.2rem, 11vw, 4rem) * ${size})` }}>
-        {count !== null ? <span className="rsvp-count">{count || '▶'}</span> : <Shown frame={frames[idx]} choice={choice} />}
+      <div className="rsvp-stage" dir="rtl" ref={stage}>
+        {count !== null ? (
+          <span className="rsvp-count">{count || '▶'}</span>
+        ) : (
+          <span className="rsvp-frame">
+            <Shown frame={frames[idx]} choice={choice} />
+          </span>
+        )}
       </div>
 
       <div className="finish-actions">
         <button className="btn icon-btn" onClick={back} aria-label={t('חזרה 10 מילים')}>
           ⏪
         </button>
+        <button className="btn icon-btn" onClick={backWord} aria-label={t('מילה אחת אחורה')}>
+          ◀
+        </button>
         <button className="btn primary icon-btn" onClick={() => setPlaying((p) => !p)} aria-label={playing ? t('עצור') : t('המשך')}>
           {playing ? '⏸' : '▶'}
         </button>
-        <button className="btn icon-btn" onClick={() => setSize((s) => Math.max(0.6, s - 0.2))} aria-label={t('אות קטנה יותר')}>
+        <button className="btn icon-btn" onClick={() => setBeat((b) => !b)} aria-label={beat ? t('כיבוי הצליל') : t('הפעלת הצליל')}>
+          {beat ? '🔔' : '🔕'}
+        </button>
+      </div>
+      <div className="finish-actions">
+        <button className="btn icon-btn" onClick={() => setSize((s) => Math.max(0.5, s / 1.25))} aria-label={t('אות קטנה יותר')}>
           א−
         </button>
-        <button className="btn icon-btn" onClick={() => setSize((s) => Math.min(1.6, s + 0.2))} aria-label={t('אות גדולה יותר')}>
+        <button className="btn icon-btn" onClick={() => setSize((s) => Math.min(4, s * 1.25))} aria-label={t('אות גדולה יותר')}>
           א+
         </button>
       </div>

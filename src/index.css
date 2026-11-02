@@ -1724,6 +1724,11 @@ select {
   line-height: 1.5;
   padding: 16px;
 }
+.rsvp-frame {
+  display: inline-flex;
+  gap: 0.5em;
+  white-space: nowrap;
+}
 .rsvp-count {
   color: var(--accent);
   font-size: 1.4em;
