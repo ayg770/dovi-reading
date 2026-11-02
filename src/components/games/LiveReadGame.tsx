@@ -152,9 +152,9 @@ export function LiveReadGame({ selection, onExit, onRestart, onPlayGroup }: Prop
     }, NEXT_DELAY_MS)
   }
 
-  const startMic = () => {
+  const startMic = (quiet = false) => {
     stopAudio()
-    sfx.start()
+    if (!quiet) sfx.start()
     if (!canRecognize) return setMic('error')
     stream.current?.stop()
     stream.current = streamListen({
@@ -180,6 +180,18 @@ export function LiveReadGame({ selection, onExit, onRestart, onPlayGroup }: Prop
     stream.current?.stop()
     stream.current = null
     setMic('off')
+  }
+
+  // While the microphone is open, a phone plays sound through the call channel: thin and hoarse.
+  // So the microphone is paused for the time a sound is played, and opened again after it.
+  const hear = async (play: () => Promise<void> | void) => {
+    const wasOn = stream.current !== null
+    if (wasOn) stopMic()
+    try {
+      await play()
+    } finally {
+      if (wasOn) startMic(true)
+    }
   }
 
   if (!items) return <div className="game loading">…</div>
@@ -254,13 +266,23 @@ export function LiveReadGame({ selection, onExit, onRestart, onPlayGroup }: Prop
         </span>
       </div>
 
+      {!isText && !sentence && items.length > index + 1 && (
+        <div className="queue" dir="rtl" aria-hidden>
+          {items.slice(index + 1, index + 5).map((it, i) => (
+            <span key={`${it.key}-${i}`} className="q-item">
+              {it.text}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="read-actions">
         {micOn ? (
           <button className={`btn big-mic on ${mic}`} onClick={stopMic} aria-label={t('עצור')}>
             <span className="mic-dot" />🎤
           </button>
         ) : (
-          <button className="btn primary big-mic" onClick={startMic} aria-label={t('התחל לקרוא')}>
+          <button className="btn primary big-mic" onClick={() => startMic()} aria-label={t('התחל לקרוא')}>
             🎤 {t('התחל לקרוא')}
           </button>
         )}
@@ -269,11 +291,11 @@ export function LiveReadGame({ selection, onExit, onRestart, onPlayGroup }: Prop
       {micError && <p className="hint-text">{micError}</p>}
 
       <div className="finish-actions">
-        <button className="btn icon-btn" onClick={() => void playItem(item)} aria-label={t('שמע')}>
+        <button className="btn icon-btn" onClick={() => void hear(() => playItem(item))} aria-label={t('שמע')}>
           🔊
         </button>
         {!sentence && item.syllables.length > 1 && (
-          <button className="btn icon-btn" onClick={() => void playGradual(item.syllables, setLit)} aria-label={t('הקראה הדרגתית')}>
+          <button className="btn icon-btn" onClick={() => void hear(() => playGradual(item.syllables, setLit))} aria-label={t('הקראה הדרגתית')}>
             🐢
           </button>
         )}

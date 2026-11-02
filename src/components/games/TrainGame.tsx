@@ -102,10 +102,11 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items])
 
-  const start = () => {
+  const start = (quiet = false) => {
     setStarted(true)
-    sfx.start()
+    if (!quiet) sfx.start()
     if (!canRecognize) return setMic('error')
+    stream.current?.stop()
     stream.current = streamListen({
       onHeard: (alts, isFinal, ri) => {
         setHeard(alts[0])
@@ -123,6 +124,22 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
         }
       },
     })
+  }
+
+  // While the microphone is open a phone plays sound through the call channel: thin and hoarse.
+  // So it is paused for the time of a sound and opened again after it.
+  const hear = async (play: () => Promise<void> | void) => {
+    const wasOn = stream.current !== null
+    if (wasOn) {
+      stream.current?.stop()
+      stream.current = null
+      setMic('off')
+    }
+    try {
+      await play()
+    } finally {
+      if (wasOn && !matcher.current?.done) start(true)
+    }
   }
 
   if (!items) return <div className="game loading">…</div>
@@ -180,7 +197,7 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
       </div>
 
       {!started ? (
-        <button className="btn primary start-btn" onClick={start}>
+        <button className="btn primary start-btn" onClick={() => start()}>
           {t('יוצאים לדרך ▶')}
         </button>
       ) : (
@@ -193,7 +210,7 @@ export function TrainGame({ selection, onExit, onRestart, onPlayGroup }: Props) 
           {micError && <p className="hint-text">{micError}</p>}
           {mic === 'error' && !micError && <p className="hint-text">{t('זיהוי הקול לא זמין כרגע')}</p>}
           <div className="finish-actions">
-            <button className="btn icon-btn" onClick={() => void playItem(current)} aria-label={t('שמע')}>
+            <button className="btn icon-btn" onClick={() => void hear(() => playItem(current))} aria-label={t('שמע')}>
               🔊
             </button>
             <button className="btn good icon-btn" onClick={() => matcher.current?.settle('ok')} aria-label={t('הורה: הוא אמר נכון ✓')}>

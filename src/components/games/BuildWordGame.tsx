@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { playGradual, playItem, playWordSyllable, praise, sfx, stopAudio } from '../../lib/audio'
+import { BASIC_NIKUD_IDS, LETTERS, NIKUD, asOpenSyllable, nikudVowel, similarLetters, syllableText } from '../../data/hebrew'
 import { Item } from '../../lib/items'
 import { Selection } from '../../lib/selection'
 import { earnStar } from '../../lib/stars'
@@ -13,17 +14,41 @@ import { Stars } from '../ui/Stars'
 
 type Tile = { id: number; text: string; used: boolean }
 
-function shuffled(texts: string[]): Tile[] {
-  const tiles = texts.map((text, id) => ({ id, text, used: false }))
-  for (let attempt = 0; attempt < 5; attempt++) {
-    for (let i = tiles.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[tiles[i], tiles[j]] = [tiles[j], tiles[i]]
-    }
-    // Don't hand him the answer already in order.
-    if (tiles.length < 2 || tiles.some((tile, i) => tile.text !== texts[i])) break
+function shuffle<T>(a: T[]): T[] {
+  const r = [...a]
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[r[i], r[j]] = [r[j], r[i]]
   }
-  return tiles
+  return r
+}
+
+/**
+ * Wrong tiles that are easy to mix up with the right ones: the same letter with another vowel
+ * (only vowels he knows, and only ones that sound different), or a look-alike letter with the
+ * same vowel.
+ */
+function distractors(item: Item, count: number): string[] {
+  const real = new Set(item.syllables.map((s) => s.text))
+  const known = new Set([...BASIC_NIKUD_IDS, ...item.syllables.map((s) => s.nikud_id).filter((x): x is number => !!x)])
+  const pool: string[] = []
+  for (const ws of item.syllables) {
+    const open = asOpenSyllable(ws)
+    if (!open) continue
+    for (const n of NIKUD)
+      if (known.has(n.id) && nikudVowel(n) !== nikudVowel(open.nikud)) pool.push(syllableText({ letter: open.letter, nikud: n }))
+    for (const g of similarLetters(open.letter.glyph)) {
+      const letter = LETTERS.find((l) => l.glyph === g)
+      if (letter && !letter.isFinal) pool.push(syllableText({ letter, nikud: open.nikud }))
+    }
+  }
+  return [...new Set(shuffle(pool))].filter((x) => !real.has(x)).slice(0, count)
+}
+
+/** The syllables and the wrong tiles, in any order — also the right one: the position tells nothing. */
+function makeTiles(item: Item): Tile[] {
+  const texts = [...item.syllables.map((s) => s.text), ...distractors(item, item.syllables.length > 2 ? 3 : 2)]
+  return shuffle(texts.map((text, id) => ({ id, text, used: false })))
 }
 
 type Props = { selection: Selection; onExit: () => void; onRestart: () => void; onPlayGroup: (groupId: string) => void }
@@ -61,7 +86,7 @@ export function BuildWordGame({ selection, onExit, onRestart, onPlayGroup }: Pro
   // A new word: shuffle its syllables and say it.
   useEffect(() => {
     if (!item) return
-    setTiles(shuffled(item.syllables.map((s) => s.text)))
+    setTiles(makeTiles(item))
     setPlaced(0)
     setMistakes(0)
     setJoined(false)
