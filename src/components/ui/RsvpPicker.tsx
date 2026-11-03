@@ -16,7 +16,7 @@ export type RsvpChoice = {
   beat: boolean
 }
 
-const KEY = 'dovi-rsvp-choice'
+const KEY = 'dovi-rsvp-choice-2'
 
 function saved(): Partial<RsvpChoice> {
   try {
@@ -52,7 +52,7 @@ export function RsvpPicker({ onStart, onExit }: { onStart: (c: RsvpChoice) => vo
   const [focal, setFocal] = useState(initial.focal ?? false)
   const [stress, setStress] = useState(initial.stress ?? false)
   const [nikud, setNikud] = useState(initial.nikud ?? true)
-  const [ramp, setRamp] = useState(initial.ramp ?? true)
+  const [ramp, setRamp] = useState(initial.ramp ?? false)
   const [beat, setBeat] = useState(initial.beat ?? true)
   const [note, setNote] = useState<string | null>(null)
   const [history, setHistory] = useState<Awaited<ReturnType<typeof loadRsvpHistory>>>([])
